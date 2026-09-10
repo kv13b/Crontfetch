@@ -1,9 +1,52 @@
-"""/api/sites — manage the list of watched sites."""
+"""/api/sites — manage the list of watched sites.
+
+The user only has to supply `name` and `url`. When no `item_selector` is given,
+the API fetches the page and auto-detects the job-listing selector itself (see
+`detect.py`); the result is stored on the site and returned under `detection`.
+"""
 from flask import Blueprint, jsonify, request
 
 from database import get_connection
+from scraper import probe_site
 
 bp = Blueprint("sites", __name__)
+
+INSERT_COLS = ("name", "url", "css_selector", "item_selector", "selector_source", "min_experience")
+
+
+def _clean_payload(data, *, require_core):
+    """Normalise a site payload. Returns (values_dict, error_message)."""
+    out = {}
+
+    if "name" in data or require_core:
+        out["name"] = (data.get("name") or "").strip()
+    if "url" in data or require_core:
+        out["url"] = (data.get("url") or "").strip()
+    if "css_selector" in data:
+        out["css_selector"] = (data.get("css_selector") or "").strip() or None
+    if "item_selector" in data:
+        out["item_selector"] = (data.get("item_selector") or "").strip() or None
+
+    if "min_experience" in data:
+        raw = data.get("min_experience")
+        if raw in (None, ""):
+            out["min_experience"] = None
+        else:
+            try:
+                years = int(raw)
+            except (TypeError, ValueError):
+                return None, "min_experience must be a whole number of years or null"
+            if years < 0:
+                return None, "min_experience cannot be negative"
+            out["min_experience"] = years
+
+    if require_core and (not out.get("name") or not out.get("url")):
+        return None, "name and url are required"
+    return out, None
+
+
+def _get_site(conn, site_id):
+    return conn.execute("SELECT * FROM sites WHERE id = ?", (site_id,)).fetchone()
 
 
 @bp.get("/api/sites")
@@ -21,24 +64,88 @@ def list_sites():
 @bp.post("/api/sites")
 def create_site():
     data = request.get_json(silent=True) or {}
-    name = (data.get("name") or "").strip()
-    url = (data.get("url") or "").strip()
-    css_selector = (data.get("css_selector") or "").strip() or None
+    values, error = _clean_payload(data, require_core=True)
+    if error:
+        return jsonify({"error": error}), 400
 
-    if not name or not url:
-        return jsonify({"error": "name and url are required"}), 400
+    manual_selector = values.get("item_selector")
+    values["selector_source"] = "manual" if manual_selector else None
 
     conn = get_connection()
     try:
         cur = conn.execute(
-            "INSERT INTO sites (name, url, css_selector) VALUES (?, ?, ?)",
-            (name, url, css_selector),
+            f"INSERT INTO sites ({', '.join(INSERT_COLS)}) "
+            f"VALUES ({', '.join('?' * len(INSERT_COLS))})",
+            [values.get(c) for c in INSERT_COLS],
         )
         conn.commit()
-        row = conn.execute(
-            "SELECT * FROM sites WHERE id = ?", (cur.lastrowid,)
-        ).fetchone()
-        return jsonify(dict(row)), 201
+        site_id = cur.lastrowid
+
+        detection = None
+        if not manual_selector:
+            detection = probe_site(values["url"])
+            if detection["ok"]:
+                conn.execute(
+                    "UPDATE sites SET item_selector = ?, selector_source = 'auto' WHERE id = ?",
+                    (detection["selector"], site_id),
+                )
+                conn.commit()
+
+        body = dict(_get_site(conn, site_id))
+        if detection is not None:
+            body["detection"] = detection
+        return jsonify(body), 201
+    finally:
+        conn.close()
+
+
+@bp.patch("/api/sites/<int:site_id>")
+def update_site(site_id):
+    data = request.get_json(silent=True) or {}
+    values, error = _clean_payload(data, require_core=False)
+    if error:
+        return jsonify({"error": error}), 400
+    if not values:
+        return jsonify({"error": "no editable fields supplied"}), 400
+
+    if "item_selector" in values:
+        values["selector_source"] = "manual" if values["item_selector"] else None
+
+    assignments = ", ".join(f"{k} = ?" for k in values)
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            f"UPDATE sites SET {assignments} WHERE id = ?",
+            [*values.values(), site_id],
+        )
+        conn.commit()
+        if cur.rowcount == 0:
+            return jsonify({"error": "site not found"}), 404
+        return jsonify(dict(_get_site(conn, site_id)))
+    finally:
+        conn.close()
+
+
+@bp.post("/api/sites/<int:site_id>/detect")
+def redetect_site(site_id):
+    """Re-run auto-detection for a site and store the result."""
+    conn = get_connection()
+    try:
+        site = _get_site(conn, site_id)
+        if site is None:
+            return jsonify({"error": "site not found"}), 404
+
+        detection = probe_site(site["url"])
+        if detection["ok"]:
+            conn.execute(
+                "UPDATE sites SET item_selector = ?, selector_source = 'auto' WHERE id = ?",
+                (detection["selector"], site_id),
+            )
+            conn.commit()
+
+        body = dict(_get_site(conn, site_id))
+        body["detection"] = detection
+        return jsonify(body)
     finally:
         conn.close()
 

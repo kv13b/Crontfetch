@@ -12,17 +12,23 @@ CREATE TABLE IF NOT EXISTS sites (
     name              TEXT NOT NULL,
     url               TEXT NOT NULL,
     css_selector      TEXT,
+    item_selector     TEXT,
+    selector_source   TEXT,
+    min_experience    INTEGER,
     created_at        TEXT NOT NULL DEFAULT (datetime('now')),
     last_checked      TEXT,
     last_content_hash TEXT
 );
 
 CREATE TABLE IF NOT EXISTS jobs (
-    id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    site_id  INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
-    title    TEXT,
-    url      TEXT,
-    found_at TEXT NOT NULL DEFAULT (datetime('now'))
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    site_id        INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    title          TEXT,
+    url            TEXT,
+    job_key        TEXT,
+    experience_min REAL,
+    experience_max REAL,
+    found_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS history (
@@ -32,6 +38,26 @@ CREATE TABLE IF NOT EXISTS history (
     status  TEXT
 );
 """
+
+# Created after migrations so the columns they reference are guaranteed to exist.
+INDEXES = """
+CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_site_key ON jobs(site_id, job_key);
+"""
+
+# Idempotent column adds for databases created before these fields existed.
+# SQLite ignores nothing here, so each is guarded by a table_info check.
+MIGRATIONS = {
+    "sites": [
+        ("item_selector", "ALTER TABLE sites ADD COLUMN item_selector TEXT"),
+        ("selector_source", "ALTER TABLE sites ADD COLUMN selector_source TEXT"),
+        ("min_experience", "ALTER TABLE sites ADD COLUMN min_experience INTEGER"),
+    ],
+    "jobs": [
+        ("job_key", "ALTER TABLE jobs ADD COLUMN job_key TEXT"),
+        ("experience_min", "ALTER TABLE jobs ADD COLUMN experience_min REAL"),
+        ("experience_max", "ALTER TABLE jobs ADD COLUMN experience_max REAL"),
+    ],
+}
 
 
 def get_connection():
@@ -43,11 +69,21 @@ def get_connection():
     return conn
 
 
+def _run_migrations(conn):
+    for table, changes in MIGRATIONS.items():
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for column, ddl in changes:
+            if column not in existing:
+                conn.execute(ddl)
+
+
 def init_db():
-    """Create tables if they do not already exist."""
+    """Create tables if missing, then apply any pending column migrations."""
     conn = get_connection()
     try:
         conn.executescript(SCHEMA)
+        _run_migrations(conn)
+        conn.executescript(INDEXES)
         conn.commit()
     finally:
         conn.close()
