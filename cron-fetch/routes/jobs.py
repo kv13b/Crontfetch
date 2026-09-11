@@ -14,6 +14,7 @@ def list_jobs():
             """
             SELECT jobs.id, jobs.site_id, jobs.title, jobs.url, jobs.found_at,
                    jobs.experience_min, jobs.experience_max,
+                   jobs.matched_location, jobs.matched_role,
                    sites.name AS site_name
             FROM jobs
             LEFT JOIN sites ON sites.id = jobs.site_id

@@ -3,15 +3,29 @@
 The user only has to supply `name` and `url`. When no `item_selector` is given,
 the API fetches the page and auto-detects the job-listing selector itself (see
 `detect.py`); the result is stored on the site and returned under `detection`.
+
+`min_experience`, `locations`, and `roles` are independent filters (all must
+pass for a listing to be recorded) - see `experience.py`, `location.py`, and
+`role.py`.
 """
+import json
+
 from flask import Blueprint, jsonify, request
 
 from database import get_connection
+from location import parse_locations
+from role import parse_roles
 from scraper import probe_site
 
 bp = Blueprint("sites", __name__)
 
-INSERT_COLS = ("name", "url", "css_selector", "item_selector", "selector_source", "min_experience")
+INSERT_COLS = (
+    "name", "url", "css_selector", "item_selector", "selector_source",
+    "min_experience", "locations", "roles",
+)
+
+# List-style filters: API field -> parser that normalises raw input to a list or None.
+LIST_FILTERS = {"locations": parse_locations, "roles": parse_roles}
 
 
 def _clean_payload(data, *, require_core):
@@ -40,6 +54,14 @@ def _clean_payload(data, *, require_core):
                 return None, "min_experience cannot be negative"
             out["min_experience"] = years
 
+    for field, parser in LIST_FILTERS.items():
+        if field in data:
+            raw = data.get(field)
+            if raw is not None and not isinstance(raw, (list, str)):
+                return None, f"{field} must be a list of strings, a comma-separated string, or null"
+            cleaned = parser(raw)
+            out[field] = json.dumps(cleaned) if cleaned else None
+
     if require_core and (not out.get("name") or not out.get("url")):
         return None, "name and url are required"
     return out, None
@@ -49,6 +71,14 @@ def _get_site(conn, site_id):
     return conn.execute("SELECT * FROM sites WHERE id = ?", (site_id,)).fetchone()
 
 
+def _serialize_site(row):
+    """Row -> dict, decoding the list-filter JSON columns into plain lists."""
+    site = dict(row)
+    for field in LIST_FILTERS:
+        site[field] = json.loads(site[field]) if site.get(field) else None
+    return site
+
+
 @bp.get("/api/sites")
 def list_sites():
     conn = get_connection()
@@ -56,7 +86,7 @@ def list_sites():
         rows = conn.execute(
             "SELECT * FROM sites ORDER BY datetime(created_at) DESC, id DESC"
         ).fetchall()
-        return jsonify([dict(r) for r in rows])
+        return jsonify([_serialize_site(r) for r in rows])
     finally:
         conn.close()
 
@@ -91,7 +121,7 @@ def create_site():
                 )
                 conn.commit()
 
-        body = dict(_get_site(conn, site_id))
+        body = _serialize_site(_get_site(conn, site_id))
         if detection is not None:
             body["detection"] = detection
         return jsonify(body), 201
@@ -121,7 +151,7 @@ def update_site(site_id):
         conn.commit()
         if cur.rowcount == 0:
             return jsonify({"error": "site not found"}), 404
-        return jsonify(dict(_get_site(conn, site_id)))
+        return jsonify(_serialize_site(_get_site(conn, site_id)))
     finally:
         conn.close()
 
@@ -143,7 +173,7 @@ def redetect_site(site_id):
             )
             conn.commit()
 
-        body = dict(_get_site(conn, site_id))
+        body = _serialize_site(_get_site(conn, site_id))
         body["detection"] = detection
         return jsonify(body)
     finally:

@@ -1,11 +1,13 @@
 """Site checking logic.
 
-For each site we pull individual job listings, read the experience requirement
-from each listing's text, and record only the new ones that match the site's
-`min_experience` filter. Listings whose experience can't be parsed are skipped.
+For each site we pull individual job listings, read the experience requirement,
+location, and role from each listing's text, and record only the new ones that
+match the site's `min_experience`, `locations`, and `roles` filters (all must
+pass). Listings that fail any one of them are skipped.
 """
 import datetime as dt
 import hashlib
+import json
 from urllib.parse import urljoin
 
 import requests
@@ -14,6 +16,8 @@ from bs4 import BeautifulSoup
 from database import get_connection
 from detect import detect_listings
 from experience import experience_matches, parse_experience
+from location import find_location
+from role import find_role
 
 USER_AGENT = "CronFetch/0.1 (+https://github.com/cronfetch)"
 MAX_TITLE_LEN = 500
@@ -135,6 +139,8 @@ def check_site(conn, site):
     if selector is None:
         return result
 
+    locations = json.loads(site["locations"]) if site["locations"] else None
+    roles = json.loads(site["roles"]) if site["roles"] else None
     page_hash = hashlib.sha256(html.encode("utf-8", "replace")).hexdigest()
     listings = _extract_listings(html, site["url"], selector)
 
@@ -152,11 +158,21 @@ def check_site(conn, site):
             result["skipped"] += 1
             continue
 
+        matched_location = find_location(locations, title)
+        if locations and not matched_location:
+            result["skipped"] += 1
+            continue
+
+        matched_role = find_role(roles, title)
+        if roles and not matched_role:
+            result["skipped"] += 1
+            continue
+
         emin, emax = parsed if parsed else (None, None)
         conn.execute(
-            "INSERT INTO jobs (site_id, title, url, job_key, experience_min, experience_max) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (site["id"], title, job_url, key, emin, emax),
+            "INSERT INTO jobs (site_id, title, url, job_key, experience_min, experience_max, "
+            "matched_location, matched_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (site["id"], title, job_url, key, emin, emax, matched_location, matched_role),
         )
         if first_run:
             result["seeded"] += 1  # existing listings recorded silently, no notification

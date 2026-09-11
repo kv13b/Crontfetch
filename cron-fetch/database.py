@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS sites (
     item_selector     TEXT,
     selector_source   TEXT,
     min_experience    INTEGER,
+    locations         TEXT,
+    roles             TEXT,
     created_at        TEXT NOT NULL DEFAULT (datetime('now')),
     last_checked      TEXT,
     last_content_hash TEXT
@@ -28,6 +30,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     job_key        TEXT,
     experience_min REAL,
     experience_max REAL,
+    matched_location TEXT,
+    matched_role   TEXT,
     found_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -51,11 +55,15 @@ MIGRATIONS = {
         ("item_selector", "ALTER TABLE sites ADD COLUMN item_selector TEXT"),
         ("selector_source", "ALTER TABLE sites ADD COLUMN selector_source TEXT"),
         ("min_experience", "ALTER TABLE sites ADD COLUMN min_experience INTEGER"),
+        ("locations", "ALTER TABLE sites ADD COLUMN locations TEXT"),
+        ("roles", "ALTER TABLE sites ADD COLUMN roles TEXT"),
     ],
     "jobs": [
         ("job_key", "ALTER TABLE jobs ADD COLUMN job_key TEXT"),
         ("experience_min", "ALTER TABLE jobs ADD COLUMN experience_min REAL"),
         ("experience_max", "ALTER TABLE jobs ADD COLUMN experience_max REAL"),
+        ("matched_location", "ALTER TABLE jobs ADD COLUMN matched_location TEXT"),
+        ("matched_role", "ALTER TABLE jobs ADD COLUMN matched_role TEXT"),
     ],
 }
 

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "CronFetch API",
-    "description": "REST API for CronFetch — watch job-listing pages and record postings that match your experience level.\n\n## Setup\n1. Start the backend: `python app.py` (serves http://127.0.0.1:5000).\n2. This collection has a `base_url` variable already set to that address — change it under the collection's **Variables** tab if you run elsewhere.\n3. Run **Sites > Create site** first: its test script stores the new id in the `site_id` collection variable, which the other Sites requests reuse.\n\n## Auto-detection\nYou only send `name` and `url`. On create, the API fetches the page and figures out the CSS selector for one job listing itself, returning the result under `detection` and storing it on the site. Pass `item_selector` explicitly only to override that. **Re-detect selector** re-runs it (e.g. after fixing a URL, or if a board changes its markup).\n\n## Typical flow\nCreate site → check `detection` in the response → Run now (first call seeds silently) → Run now again → List jobs / List history.",
+    "description": "REST API for CronFetch — watch job-listing pages and record postings that match your experience level, preferred locations, and role.\n\n## Setup\n1. Start the backend: `python app.py` (serves http://127.0.0.1:5000).\n2. This collection has a `base_url` variable already set to that address — change it under the collection's **Variables** tab if you run elsewhere.\n3. Run **Sites > Create site** first: its test script stores the new id in the `site_id` collection variable, which the other Sites requests reuse.\n\n## Auto-detection\nYou only send `name` and `url`. On create, the API fetches the page and figures out the CSS selector for one job listing itself, returning the result under `detection` and storing it on the site. Pass `item_selector` explicitly only to override that. **Re-detect selector** re-runs it (e.g. after fixing a URL, or if a board changes its markup).\n\n## Filters\n`min_experience`, `locations`, and `roles` are independent filters — a listing is only recorded when **all three** pass. `locations` and `roles` are each a list (e.g. `[\"India\", \"Remote\"]`, `[\"Engineering\", \"Software Developer\"]`); a listing matches a list filter when its card text contains **any one** entry, case-insensitively (OR within a filter, AND across filters). `null`/omitted on any field disables that filter.\n\n## Typical flow\nCreate site → check `detection` in the response → Run now (first call seeds silently) → Run now again → List jobs / List history.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -58,10 +58,10 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Acme Careers\",\n  \"url\": \"https://acme.example/careers\",\n  \"min_experience\": 3\n}"
+              "raw": "{\n  \"name\": \"Acme Careers\",\n  \"url\": \"https://acme.example/careers\",\n  \"min_experience\": 3,\n  \"locations\": [\"India\", \"Remote\"],\n  \"roles\": [\"Engineering\", \"Software Developer\"]\n}"
             },
             "url": { "raw": "{{base_url}}/api/sites", "host": ["{{base_url}}"], "path": ["api", "sites"] },
-            "description": "Add a site to watch.\n\n| field | required | notes |\n|---|---|---|\n| `name` | yes | display name |\n| `url` | yes | listings page to fetch |\n| `min_experience` | no | your years of experience as a whole number. A listing is kept when its parsed range contains this value. `null` / omitted = no filter (record everything). |\n| `item_selector` | no | **override** the auto-detected selector. One element per job card. |\n| `css_selector` | no | fallback selector, used only when `item_selector` is empty and nothing was auto-detected |\n\nThe response includes a `detection` object when auto-detection ran:\n```\n\"detection\": {\n  \"ok\": true,\n  \"selector\": \"li.section29__search-results-li\",\n  \"count\": 15,\n  \"sample\": [\"Senior IT Software Engineer ...\", ...],\n  \"alternatives\": [\"...\"],\n  \"note\": \"auto-detected (score 110, 15 listings)\"\n}\n```\n`ok: false` means the page is JavaScript-rendered or the URL failed — the site is still created; fix the URL and call **Re-detect selector**, or set `item_selector` yourself with **Update site**.\n\nThe test script saves the returned `id` into the `site_id` variable."
+            "description": "Add a site to watch.\n\n| field | required | notes |\n|---|---|---|\n| `name` | yes | display name |\n| `url` | yes | listings page to fetch |\n| `min_experience` | no | your years of experience as a whole number. A listing is kept when its parsed range contains this value. `null` / omitted = no filter (record everything). |\n| `locations` | no | list of location strings to match against (frontend gives fixed choices, e.g. `[\"India\", \"Remote\"]`), or a comma-separated string. A listing is kept when its card text contains any one of them (case-insensitive substring). `null` / omitted / `[]` = no filter. |\n| `roles` | no | list of role/title keywords (e.g. `[\"Engineering\", \"Software Developer\"]`), or a comma-separated string. Same substring-OR matching as `locations`. `null` / omitted / `[]` = no filter. |\n| `item_selector` | no | **override** the auto-detected selector. One element per job card. |\n| `css_selector` | no | fallback selector, used only when `item_selector` is empty and nothing was auto-detected |\n\nAll three filters are independent — a listing needs to pass `min_experience` AND `locations` AND `roles` to be recorded.\n\nThe response includes a `detection` object when auto-detection ran:\n```\n\"detection\": {\n  \"ok\": true,\n  \"selector\": \"li.section29__search-results-li\",\n  \"count\": 15,\n  \"sample\": [\"Senior IT Software Engineer ...\", ...],\n  \"alternatives\": [\"...\"],\n  \"note\": \"auto-detected (score 110, 15 listings)\"\n}\n```\n`ok: false` means the page is JavaScript-rendered or the URL failed — the site is still created; fix the URL and call **Re-detect selector**, or set `item_selector` yourself with **Update site**.\n\nThe test script saves the returned `id` into the `site_id` variable."
           }
         },
         {
@@ -84,14 +84,14 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"min_experience\": 0\n}"
+              "raw": "{\n  \"min_experience\": 0,\n  \"locations\": [\"India\"],\n  \"roles\": [\"Engineering\"]\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/sites/{{site_id}}",
               "host": ["{{base_url}}"],
               "path": ["api", "sites", "{{site_id}}"]
             },
-            "description": "Edit any subset of `name`, `url`, `css_selector`, `item_selector`, `min_experience`. Send `\"min_experience\": null` to turn the filter off. Setting `item_selector` here marks `selector_source` as `manual` (auto-detection won't overwrite it); setting it to `\"\"`/`null` clears that. 404 if the id does not exist."
+            "description": "Edit any subset of `name`, `url`, `css_selector`, `item_selector`, `min_experience`, `locations`, `roles`. Send `null` on any filter field to turn it off. Setting `item_selector` here marks `selector_source` as `manual` (auto-detection won't overwrite it); setting it to `\"\"`/`null` clears that. 404 if the id does not exist."
           }
         },
         {
@@ -118,7 +118,7 @@
             "method": "GET",
             "header": [],
             "url": { "raw": "{{base_url}}/api/jobs", "host": ["{{base_url}}"], "path": ["api", "jobs"] },
-            "description": "Last 100 matched listings, newest first. Each row includes `site_name`, `url`, and the parsed `experience_min` / `experience_max` (either may be null)."
+            "description": "Last 100 matched listings, newest first. Each row includes `site_name`, `url`, the parsed `experience_min` / `experience_max` (either may be null), `matched_location`, and `matched_role` — whichever entry from the site's `locations` / `roles` filters was found in this listing (null when that site has no such filter)."
           }
         }
       ]
@@ -146,7 +146,7 @@
             "method": "POST",
             "header": [],
             "url": { "raw": "{{base_url}}/api/run-now", "host": ["{{base_url}}"], "path": ["api", "run-now"] },
-            "description": "Run the check immediately for every site instead of waiting for the 15-minute timer.\n\nResponse `result` summary:\n- `new_jobs` — matched listings recorded this run (these create `pending` history rows)\n- `skipped` — listings that did not match the filter or had no detectable experience\n- `seeded` — listings recorded silently on a site's **first** check (no alerts)\n- `errors` — sites that failed to fetch\n- `details` — the same numbers broken down per site\n\nThe **first** Run now after creating a site only seeds; matches start alerting from the second run onward."
+            "description": "Run the check immediately for every site instead of waiting for the 15-minute timer.\n\nResponse `result` summary:\n- `new_jobs` — matched listings recorded this run (these create `pending` history rows)\n- `skipped` — listings that failed the experience, location, or role filter (or had no detectable experience when `min_experience` is set)\n- `seeded` — listings recorded silently on a site's **first** check (no alerts)\n- `errors` — sites that failed to fetch\n- `details` — the same numbers broken down per site\n\nThe **first** Run now after creating a site only seeds; matches start alerting from the second run onward."
           }
         }
       ]

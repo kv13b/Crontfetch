@@ -1,14 +1,17 @@
 # CronFetch — backend
 
 A small Flask REST API that watches job-listing pages on a schedule and records
-only the postings that match your experience level.
+only the postings that match your experience level, preferred locations, and role.
 
-You register a site by **URL only** and tell it how many years of experience you
-have. CronFetch fetches the page, auto-detects the CSS selector for the job
-cards, and from then on — every 15 minutes — pulls out the individual listings,
-reads the "years of experience" requirement from each one, and logs the **new**
-listings that fit. Listings that don't match, or that don't state an experience
-requirement, are ignored.
+You register a site by **URL only** and set three independent filters: how many
+years of experience you have, which locations you want (e.g. `India`, `Remote`
+— the frontend offers a fixed list, you pick any number of them), and which
+roles you want (e.g. `Engineering`, `Software Developer`). CronFetch fetches
+the page, auto-detects the CSS selector for the job cards, and from then on —
+every 15 minutes — pulls out the individual listings, reads the experience
+requirement, location, and role from each one's text, and logs the **new**
+listings where **all three** filters pass. Listings that fail any one of them,
+or that don't state an experience requirement, are ignored.
 
 This repo is the backend only. A React dashboard and a Telegram notifier are
 planned to sit in front of it.
@@ -22,7 +25,7 @@ React frontend  ──HTTP──▶  Flask API  ──▶  SQLite (instance/cron
                                      ├─ fetch each site (requests)
                                      ├─ auto-detect job-card selector (first time)
                                      ├─ extract job cards (BeautifulSoup)
-                                     ├─ parse experience from card text
+                                     ├─ parse experience + location + role from card text
                                      └─ store new matches → jobs + history
 ```
 
@@ -34,6 +37,9 @@ React frontend  ──HTTP──▶  Flask API  ──▶  SQLite (instance/cron
 - **`detect.py`** – `detect_listings(html, url)`: finds the repeating job-card
   selector automatically (known-ATS patterns + a generic scoring heuristic).
 - **`experience.py`** – `parse_experience(text)` and `experience_matches(...)`.
+- **`location.py`** – `parse_locations(raw)` and `find_location(locations, text)`.
+- **`role.py`** – `parse_roles(raw)` and `find_role(roles, text)` (same pattern
+  as `location.py`, applied to job title/department instead of location).
 - **`routes/`** – one Blueprint per resource (`sites`, `jobs`, `history`).
 - **`instance/`** – holds the SQLite file (git-ignored, created on first run).
 
@@ -67,6 +73,36 @@ site is still created, but flagged.
 A listing is kept when `job_min ≤ your_years ≤ job_max`. `None` (unparseable)
 is skipped. Set a site's `min_experience` to `null` to disable filtering for
 that site.
+
+### Location matching
+
+`locations` is a list you set per site (typically chosen from a fixed set in
+the frontend, e.g. `India`, `Remote`). There's no geocoding — `find_location()`
+just checks, case-insensitively, whether any of those strings appears anywhere
+in the listing's card text. This works because job cards embed their location
+directly (`"Backend Developer  Bengaluru, Karnataka, India  Engineering"`).
+
+A listing is kept only if it contains **at least one** of the selected
+locations (OR across your choices). `matched_location` on the stored job
+records which one matched. Set `locations` to `null` / `[]` to disable
+location filtering for that site.
+
+### Role matching
+
+`roles` works exactly like `locations`, just matched against the same card
+text for role/title keywords instead (e.g. `Engineering`, `Software
+Developer`, `Data Science`). It's a plain substring check, not a taxonomy —
+"Software Developer" won't match a card that only says "Software Engineer",
+so list every phrasing you'd accept (`["Engineer", "Developer", "SDE"]`, say).
+`matched_role` on the stored job records which one matched. Set `roles` to
+`null` / `[]` to disable it.
+
+### Combining filters
+
+`min_experience`, `locations`, and `roles` are fully independent — a listing
+is recorded only when **all three that are set** pass. Within `locations` or
+`roles` it's OR (any one entry is enough); across the three filter types it's
+AND.
 
 ### First-run seeding
 
@@ -125,16 +161,19 @@ Base URL: `http://127.0.0.1:5000`
 |---|---|---|---|
 | `GET` | `/health` | – | Liveness probe |
 | `GET` | `/api/sites` | – | All watched sites |
-| `POST` | `/api/sites` | `{name, url, min_experience?, item_selector?}` | Add a site; auto-detects the selector and returns a `detection` object |
+| `POST` | `/api/sites` | `{name, url, min_experience?, locations?, roles?, item_selector?}` | Add a site; auto-detects the selector and returns a `detection` object |
 | `POST` | `/api/sites/<id>/detect` | – | Re-run auto-detection and save the result |
-| `PATCH` | `/api/sites/<id>` | any subset of `name, url, css_selector, item_selector, min_experience` | Edit a site (change the filter, fix the URL, set a manual selector) |
+| `PATCH` | `/api/sites/<id>` | any subset of `name, url, css_selector, item_selector, min_experience, locations, roles` | Edit a site (change a filter, fix the URL, set a manual selector) |
 | `DELETE` | `/api/sites/<id>` | – | Remove a site (its jobs cascade) |
-| `GET` | `/api/jobs` | – | Last 100 matched jobs, with `site_name` |
+| `GET` | `/api/jobs` | – | Last 100 matched jobs, with `site_name`, `matched_location`, `matched_role` |
 | `GET` | `/api/history` | – | Last 200 check/notification log rows |
 | `POST` | `/api/run-now` | – | Run `run_check()` immediately |
 
 `min_experience` is your years of experience as a whole number, or `null` for no
-filter. `item_selector` is optional and overrides auto-detection;
+filter. `locations` and `roles` are each a list of strings (or a comma-separated
+string) such as `["India", "Remote"]` / `["Engineering", "Software Developer"]`,
+or `null`/`[]` for no filter — all set filters must pass for a listing to be
+recorded. `item_selector` is optional and overrides auto-detection;
 `css_selector` is a last-resort fallback used only when neither an auto-detected
 nor a manual `item_selector` exists.
 
@@ -143,8 +182,9 @@ nor a manual `item_selector` exists.
 ```bash
 curl -X POST http://127.0.0.1:5000/api/sites \
   -H "Content-Type: application/json" \
-  -d '{"name":"Acme Careers","url":"https://acme.example/careers","min_experience":3}'
+  -d '{"name":"Acme Careers","url":"https://acme.example/careers","min_experience":3,"locations":["India","Remote"],"roles":["Engineering","Software Developer"]}'
 # -> 201 { ..., "item_selector": "li.job-card", "selector_source": "auto",
+#          "locations": ["India", "Remote"], "roles": ["Engineering", "Software Developer"],
 #          "detection": { "ok": true, "count": 25, "sample": [...], "note": "..." } }
 
 curl -X POST http://127.0.0.1:5000/api/run-now    # 1st call seeds, later calls alert
@@ -162,6 +202,8 @@ cron-fetch/
 ├── scraper.py          # run_check() pipeline + probe_site()
 ├── detect.py           # automatic job-card selector detection
 ├── experience.py       # experience parsing / matching
+├── location.py         # location filter parsing / matching
+├── role.py             # role/title filter parsing / matching
 ├── routes/
 │   ├── __init__.py     # exposes `blueprints`
 │   ├── sites.py
@@ -200,6 +242,8 @@ exercise the pipeline with predictable content.
 
 ```bash
 python experience.py          # runs the experience parser against sample titles
+python location.py            # runs the location matcher against sample titles
+python role.py                # runs the role matcher against sample titles
 ```
 
 ### Updating dependencies
@@ -220,4 +264,11 @@ pip freeze > requirements.txt
 - Experience is parsed from the **listing card** text only; sites that show years
   of experience only on the job detail page won't filter (all their listings
   count as "experience unknown" and are skipped unless `min_experience` is null).
+- Location matching is a plain substring check on the same card text — no
+  geocoding, no city/country hierarchy (selecting "India" won't also match a
+  card that only says "Bengaluru" unless the card text also says "India").
+  Sites that put location only on the detail page won't filter by it either.
+- Role matching is the same plain substring check — no synonym list, so
+  "Software Developer" won't match "Software Engineer" on its own. Add every
+  phrasing you want as a separate entry in `roles`.
 - No automated test suite yet.
