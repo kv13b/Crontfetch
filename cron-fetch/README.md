@@ -1,17 +1,18 @@
 # CronFetch — backend
 
 A small Flask REST API that watches job-listing pages on a schedule and records
-only the postings that match your experience level, preferred locations, and role.
+only the postings that match your experience band, preferred locations, and role.
 
-You register a site by **URL only** and set three independent filters: how many
-years of experience you have, which locations you want (e.g. `India`, `Remote`
-— the frontend offers a fixed list, you pick any number of them), and which
-roles you want (e.g. `Engineering`, `Software Developer`). CronFetch fetches
-the page, auto-detects the CSS selector for the job cards, and from then on —
-every 15 minutes — pulls out the individual listings, reads the experience
-requirement, location, and role from each one's text, and logs the **new**
-listings where **all three** filters pass. Listings that fail any one of them,
-or that don't state an experience requirement, are ignored.
+You register a site by **URL only** and set independent filters: an experience
+band (`min_experience`/`max_experience`), which locations you want (e.g.
+`India`, `Remote` — the frontend offers a fixed list, you pick any number of
+them), and which roles you want (e.g. `Engineering`, `Software Developer`).
+CronFetch fetches the page, auto-detects the CSS selector for the job cards,
+and from then on — every 15 minutes — pulls out the individual listings, reads
+the experience requirement, location, and role from each one's text, and logs
+the **new** listings where **every filter you set** passes. Listings that fail
+any one of them, or that don't state an experience requirement when an
+experience filter is set, are ignored.
 
 This repo is the backend only. A React dashboard and a Telegram notifier are
 planned to sit in front of it.
@@ -67,12 +68,23 @@ site is still created, but flagged.
 
 `parse_experience()` understands text such as `2-4 years`, `5+ years`,
 `minimum 3 years`, `up to 2 years`, `7 years experience`, `fresher` /
-`entry level`. It returns `(min, max)` (with `max = None` for open-ended) or
-`None` when nothing is found.
+`entry level`. It returns `(job_min, job_max)` (with `job_max = None` for
+open-ended) or `None` when nothing is found.
 
-A listing is kept when `job_min ≤ your_years ≤ job_max`. `None` (unparseable)
-is skipped. Set a site's `min_experience` to `null` to disable filtering for
-that site.
+`min_experience` and `max_experience` describe **your** band, and a listing is
+kept when its own `(job_min, job_max)` **overlaps** that band:
+
+| you set | your effective band | meaning |
+|---|---|---|
+| `min_experience` only | `[min, min]` | point match — a listing must be pitched at exactly that level (this is the original single-value behaviour, unchanged) |
+| `max_experience` only | `[0, max]` | "nothing more senior than this" |
+| both | `[min, max]` | a real range — a listing matches if it overlaps at all |
+| neither | no filter | every listing passes this check |
+
+A listing with no detectable experience (`parse_experience()` returned `None`)
+is skipped whenever either bound is set. `min_experience` may not be greater
+than `max_experience` — the API rejects that with 400. Set both to `null` to
+disable experience filtering for a site.
 
 ### Location matching
 
@@ -99,10 +111,10 @@ so list every phrasing you'd accept (`["Engineer", "Developer", "SDE"]`, say).
 
 ### Combining filters
 
-`min_experience`, `locations`, and `roles` are fully independent — a listing
-is recorded only when **all three that are set** pass. Within `locations` or
-`roles` it's OR (any one entry is enough); across the three filter types it's
-AND.
+The experience band, `locations`, and `roles` are fully independent — a
+listing is recorded only when **every filter that's set** passes. Within
+`locations` or `roles` it's OR (any one entry is enough); across the three
+filter types it's AND.
 
 ### First-run seeding
 
@@ -161,29 +173,34 @@ Base URL: `http://127.0.0.1:5000`
 |---|---|---|---|
 | `GET` | `/health` | – | Liveness probe |
 | `GET` | `/api/sites` | – | All watched sites |
-| `POST` | `/api/sites` | `{name, url, min_experience?, locations?, roles?, item_selector?}` | Add a site; auto-detects the selector and returns a `detection` object |
+| `POST` | `/api/sites` | `{name, url, min_experience?, max_experience?, locations?, roles?, item_selector?}` | Add a site; auto-detects the selector and returns a `detection` object |
 | `POST` | `/api/sites/<id>/detect` | – | Re-run auto-detection and save the result |
-| `PATCH` | `/api/sites/<id>` | any subset of `name, url, css_selector, item_selector, min_experience, locations, roles` | Edit a site (change a filter, fix the URL, set a manual selector) |
+| `PATCH` | `/api/sites/<id>` | any subset of `name, url, css_selector, item_selector, min_experience, max_experience, locations, roles` | Edit a site (change a filter, fix the URL, set a manual selector) |
 | `DELETE` | `/api/sites/<id>` | – | Remove a site (its jobs cascade) |
 | `GET` | `/api/jobs` | – | Last 100 matched jobs, with `site_name`, `matched_location`, `matched_role` |
 | `GET` | `/api/history` | – | Last 200 check/notification log rows |
 | `POST` | `/api/run-now` | – | Run `run_check()` immediately |
 
-`min_experience` is your years of experience as a whole number, or `null` for no
-filter. `locations` and `roles` are each a list of strings (or a comma-separated
-string) such as `["India", "Remote"]` / `["Engineering", "Software Developer"]`,
-or `null`/`[]` for no filter — all set filters must pass for a listing to be
-recorded. `item_selector` is optional and overrides auto-detection;
-`css_selector` is a last-resort fallback used only when neither an auto-detected
-nor a manual `item_selector` exists.
+`min_experience`/`max_experience` are whole numbers of years describing your
+band (see the table above for how a single bound behaves); `min_experience`
+greater than `max_experience` is rejected with 400 (checked against whatever
+is already stored, so a `PATCH` that only touches one bound is validated
+against the current value of the other). `locations` and `roles` are each a
+list of strings (or a comma-separated string) such as `["India", "Remote"]` /
+`["Engineering", "Software Developer"]`, or `null`/`[]` for no filter — every
+filter that's set must pass for a listing to be recorded. `item_selector` is
+optional and overrides auto-detection; `css_selector` is a last-resort
+fallback used only when neither an auto-detected nor a manual `item_selector`
+exists.
 
 ### Example
 
 ```bash
 curl -X POST http://127.0.0.1:5000/api/sites \
   -H "Content-Type: application/json" \
-  -d '{"name":"Acme Careers","url":"https://acme.example/careers","min_experience":3,"locations":["India","Remote"],"roles":["Engineering","Software Developer"]}'
+  -d '{"name":"Acme Careers","url":"https://acme.example/careers","min_experience":2,"max_experience":5,"locations":["India","Remote"],"roles":["Engineering","Software Developer"]}'
 # -> 201 { ..., "item_selector": "li.job-card", "selector_source": "auto",
+#          "min_experience": 2, "max_experience": 5,
 #          "locations": ["India", "Remote"], "roles": ["Engineering", "Software Developer"],
 #          "detection": { "ok": true, "count": 25, "sample": [...], "note": "..." } }
 
@@ -241,7 +258,7 @@ Point a site at a page you control (or a local `python -m http.server`) to
 exercise the pipeline with predictable content.
 
 ```bash
-python experience.py          # runs the experience parser against sample titles
+python experience.py          # runs the experience parser + band matching against sample titles
 python location.py            # runs the location matcher against sample titles
 python role.py                # runs the role matcher against sample titles
 ```
@@ -263,7 +280,12 @@ pip freeze > requirements.txt
   on every scheduled run until fixed — no back-off yet.
 - Experience is parsed from the **listing card** text only; sites that show years
   of experience only on the job detail page won't filter (all their listings
-  count as "experience unknown" and are skipped unless `min_experience` is null).
+  count as "experience unknown" and are skipped whenever `min_experience` or
+  `max_experience` is set).
+- An open-ended job requirement ("1+ years", parsed as `(1, None)`) is treated
+  as having no known upper bound, so it can still pass a `max_experience`
+  filter as long as its stated minimum is within your band — there's no way to
+  tell from the text alone whether such a posting is actually capped.
 - Location matching is a plain substring check on the same card text — no
   geocoding, no city/country hierarchy (selecting "India" won't also match a
   card that only says "Bengaluru" unless the card text also says "India").

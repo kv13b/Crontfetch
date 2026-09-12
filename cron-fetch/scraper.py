@@ -2,8 +2,9 @@
 
 For each site we pull individual job listings, read the experience requirement,
 location, and role from each listing's text, and record only the new ones that
-match the site's `min_experience`, `locations`, and `roles` filters (all must
-pass). Listings that fail any one of them are skipped.
+match the site's `min_experience`/`max_experience` band, `locations`, and
+`roles` filters (all must pass). Listings that fail any one of them are
+skipped.
 """
 import datetime as dt
 import hashlib
@@ -152,9 +153,7 @@ def check_site(conn, site):
             continue  # already seen
 
         parsed = parse_experience(title)
-        if site["min_experience"] is not None and not experience_matches(
-            site["min_experience"], parsed
-        ):
+        if not experience_matches(site["min_experience"], site["max_experience"], parsed):
             result["skipped"] += 1
             continue
 

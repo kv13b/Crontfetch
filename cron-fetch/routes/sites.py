@@ -4,9 +4,9 @@ The user only has to supply `name` and `url`. When no `item_selector` is given,
 the API fetches the page and auto-detects the job-listing selector itself (see
 `detect.py`); the result is stored on the site and returned under `detection`.
 
-`min_experience`, `locations`, and `roles` are independent filters (all must
-pass for a listing to be recorded) - see `experience.py`, `location.py`, and
-`role.py`.
+`min_experience`/`max_experience`, `locations`, and `roles` are independent
+filters (all must pass for a listing to be recorded) - see `experience.py`,
+`location.py`, and `role.py`.
 """
 import json
 
@@ -21,8 +21,11 @@ bp = Blueprint("sites", __name__)
 
 INSERT_COLS = (
     "name", "url", "css_selector", "item_selector", "selector_source",
-    "min_experience", "locations", "roles",
+    "min_experience", "max_experience", "locations", "roles",
 )
+
+# Whole-number-or-null filters, validated the same way.
+INT_FILTERS = ("min_experience", "max_experience")
 
 # List-style filters: API field -> parser that normalises raw input to a list or None.
 LIST_FILTERS = {"locations": parse_locations, "roles": parse_roles}
@@ -41,18 +44,20 @@ def _clean_payload(data, *, require_core):
     if "item_selector" in data:
         out["item_selector"] = (data.get("item_selector") or "").strip() or None
 
-    if "min_experience" in data:
-        raw = data.get("min_experience")
+    for field in INT_FILTERS:
+        if field not in data:
+            continue
+        raw = data.get(field)
         if raw in (None, ""):
-            out["min_experience"] = None
+            out[field] = None
         else:
             try:
                 years = int(raw)
             except (TypeError, ValueError):
-                return None, "min_experience must be a whole number of years or null"
+                return None, f"{field} must be a whole number of years or null"
             if years < 0:
-                return None, "min_experience cannot be negative"
-            out["min_experience"] = years
+                return None, f"{field} cannot be negative"
+            out[field] = years
 
     for field, parser in LIST_FILTERS.items():
         if field in data:
@@ -65,6 +70,12 @@ def _clean_payload(data, *, require_core):
     if require_core and (not out.get("name") or not out.get("url")):
         return None, "name and url are required"
     return out, None
+
+
+def _validate_experience_bounds(min_years, max_years):
+    if min_years is not None and max_years is not None and min_years > max_years:
+        return "min_experience cannot be greater than max_experience"
+    return None
 
 
 def _get_site(conn, site_id):
@@ -95,6 +106,10 @@ def list_sites():
 def create_site():
     data = request.get_json(silent=True) or {}
     values, error = _clean_payload(data, require_core=True)
+    if error:
+        return jsonify({"error": error}), 400
+
+    error = _validate_experience_bounds(values.get("min_experience"), values.get("max_experience"))
     if error:
         return jsonify({"error": error}), 400
 
@@ -141,16 +156,24 @@ def update_site(site_id):
     if "item_selector" in values:
         values["selector_source"] = "manual" if values["item_selector"] else None
 
-    assignments = ", ".join(f"{k} = ?" for k in values)
     conn = get_connection()
     try:
-        cur = conn.execute(
+        current = _get_site(conn, site_id)
+        if current is None:
+            return jsonify({"error": "site not found"}), 404
+
+        effective_min = values.get("min_experience", current["min_experience"])
+        effective_max = values.get("max_experience", current["max_experience"])
+        error = _validate_experience_bounds(effective_min, effective_max)
+        if error:
+            return jsonify({"error": error}), 400
+
+        assignments = ", ".join(f"{k} = ?" for k in values)
+        conn.execute(
             f"UPDATE sites SET {assignments} WHERE id = ?",
             [*values.values(), site_id],
         )
         conn.commit()
-        if cur.rowcount == 0:
-            return jsonify({"error": "site not found"}), 404
         return jsonify(_serialize_site(_get_site(conn, site_id)))
     finally:
         conn.close()

@@ -5,9 +5,15 @@ parse_experience(text) -> (min_years, max_years) | None
   - max_years is None when the requirement is open-ended ("5+ years")
   - returns None when no experience requirement could be found
 
-experience_matches(user_years, parsed) -> bool
-  - True when the user's years fall inside the parsed band
-  - False when parsed is None (unknown experience is skipped by design)
+experience_matches(min_years, max_years, parsed) -> bool
+  - min_years / max_years describe the band of experience you're open to; a
+    listing matches when its own (job_min, job_max) range overlaps that band.
+  - either bound may be None: only min_years given -> band is the single
+    point [min_years, min_years] (matches jobs pitched at exactly that level);
+    only max_years given -> band is [0, max_years] ("nothing too senior");
+    neither given -> no filter, always matches.
+  - False when parsed is None and a filter is set (unknown experience is
+    skipped by design); True when parsed is None and no filter is set.
 """
 import re
 
@@ -56,15 +62,26 @@ def parse_experience(text):
     return None
 
 
-def experience_matches(user_years, parsed):
-    """User has `user_years` of experience; does the parsed requirement fit?"""
-    if parsed is None or user_years is None:
+def experience_matches(min_years, max_years, parsed):
+    """Does the parsed job requirement overlap the [min_years, max_years] band?
+
+    See the module docstring for how a missing bound is defaulted. This is a
+    strict generalisation of the old single-value check: passing only
+    `min_years` reproduces the original point-match behaviour exactly.
+    """
+    if min_years is None and max_years is None:
+        return True
+    if parsed is None:
         return False
-    lo, hi = parsed
-    lo = lo or 0.0
-    if user_years < lo:
+
+    band_lo = 0.0 if min_years is None else min_years
+    band_hi = min_years if max_years is None else max_years
+
+    job_lo, job_hi = parsed
+    job_lo = job_lo or 0.0
+    if job_lo > band_hi:
         return False
-    if hi is not None and user_years > hi:
+    if job_hi is not None and job_hi < band_lo:
         return False
     return True
 
@@ -81,3 +98,10 @@ if __name__ == "__main__":
     ]
     for s in samples:
         print(f"{parse_experience(s)!s:>16}  <-  {s}")
+
+    print()
+    bands = [(3, None), (None, 3), (2, 5)]
+    jobs = [(2.0, 4.0), (5.0, None), (0.0, 1.0), (6.0, 8.0)]
+    for band in bands:
+        row = [experience_matches(*band, job) for job in jobs]
+        print(f"band {band!s:>10}  vs jobs {jobs} -> {row}")
