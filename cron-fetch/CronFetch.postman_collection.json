@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "CronFetch API",
-    "description": "REST API for CronFetch — watch job-listing pages and record postings that match your experience band, preferred locations, and role.\n\n## Setup\n1. Start the backend: `python app.py` (serves http://127.0.0.1:5000).\n2. This collection has a `base_url` variable already set to that address — change it under the collection's **Variables** tab if you run elsewhere.\n3. Run **Sites > Create site** first: its test script stores the new id in the `site_id` collection variable, which the other Sites requests reuse.\n\n## Auto-detection\nYou only send `name` and `url`. On create, the API fetches the page and figures out the CSS selector for one job listing itself, returning the result under `detection` and storing it on the site. Pass `item_selector` explicitly only to override that. **Re-detect selector** re-runs it (e.g. after fixing a URL, or if a board changes its markup).\n\n## Filters\n`min_experience`/`max_experience`, `locations`, and `roles` are independent filters — a listing is only recorded when **all** pass. `min_experience`/`max_experience` describe a band: give only `min_experience` for a point match at that level (old behaviour), only `max_experience` for \"nothing more senior than N years\", or both for a real range; `min_experience` can't exceed `max_experience` (400 otherwise). `locations` and `roles` are each a list (e.g. `[\"India\", \"Remote\"]`, `[\"Engineering\", \"Software Developer\"]`); a listing matches a list filter when its card text contains **any one** entry, case-insensitively (OR within a filter, AND across filters). `null`/omitted on any field disables that filter.\n\n## Typical flow\nCreate site → check `detection` in the response → Run now (first call seeds silently) → Run now again → List jobs / List history.",
+    "description": "REST API for CronFetch — watch job-listing pages, record postings that match your experience band, preferred locations, and role, and push each new match to Telegram.\n\n## Setup\n1. Start the backend: `python app.py` (serves http://127.0.0.1:5000).\n2. This collection has a `base_url` variable already set to that address — change it under the collection's **Variables** tab if you run elsewhere.\n3. Run **Sites > Create site** first: its test script stores the new id in the `site_id` collection variable, which the other Sites requests reuse.\n4. For Telegram: copy `.env.example` to `.env`, fill in `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` (instructions in that file), restart the server, then run **Notify > Send test message** to confirm it works.\n\n## Auto-detection\nYou only send `name` and `url`. On create, the API fetches the page and figures out the CSS selector for one job listing itself, returning the result under `detection` and storing it on the site. Pass `item_selector` explicitly only to override that. **Re-detect selector** re-runs it (e.g. after fixing a URL, or if a board changes its markup).\n\n## Filters\n`min_experience`/`max_experience`, `locations`, and `roles` are independent filters — a listing is only recorded when **all** pass. `min_experience`/`max_experience` describe a band: give only `min_experience` for a point match at that level (old behaviour), only `max_experience` for \"nothing more senior than N years\", or both for a real range; `min_experience` can't exceed `max_experience` (400 otherwise). `locations` and `roles` are each a list (e.g. `[\"India\", \"Remote\"]`, `[\"Engineering\", \"Software Developer\"]`); a listing matches a list filter when its card text contains **any one** entry, case-insensitively (OR within a filter, AND across filters). `null`/omitted on any field disables that filter.\n\n## Notifications\nEvery `POST /api/run-now` (manual or the 15-min scheduler) ends by pushing each new match to Telegram as one message (title, experience/location/role, url) and marking it `sent` in `/api/history`. If Telegram isn't configured, or a send fails, the match stays `pending` and is retried on the next run (or via **Notify > Retry pending**) — nothing is lost.\n\n## Typical flow\nCreate site → check `detection` in the response → Run now (first call seeds silently) → Run now again → List jobs / List history / check `notified` in the Run now response.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -132,7 +132,7 @@
             "method": "GET",
             "header": [],
             "url": { "raw": "{{base_url}}/api/history", "host": ["{{base_url}}"], "path": ["api", "history"] },
-            "description": "Last 200 log rows. `status` is one of: `pending` (a match awaiting notification), `error` (a fetch/parse failure), `info` (e.g. first-run seeding notice)."
+            "description": "Last 200 log rows. `status` is one of: `pending` (a match found but not yet sent to Telegram, or Telegram isn't configured / the last send failed), `sent` (delivered to Telegram), `error` (a fetch/parse failure), `info` (e.g. first-run seeding notice). Rows for a job match carry `job_id`; others have it `null`."
           }
         }
       ]
@@ -146,7 +146,39 @@
             "method": "POST",
             "header": [],
             "url": { "raw": "{{base_url}}/api/run-now", "host": ["{{base_url}}"], "path": ["api", "run-now"] },
-            "description": "Run the check immediately for every site instead of waiting for the 15-minute timer.\n\nResponse `result` summary:\n- `new_jobs` — matched listings recorded this run (these create `pending` history rows)\n- `skipped` — listings that failed the experience, location, or role filter (or had no detectable experience when `min_experience` is set)\n- `seeded` — listings recorded silently on a site's **first** check (no alerts)\n- `errors` — sites that failed to fetch\n- `details` — the same numbers broken down per site\n\nThe **first** Run now after creating a site only seeds; matches start alerting from the second run onward."
+            "description": "Run the check immediately for every site instead of waiting for the 15-minute timer.\n\nResponse `result` summary:\n- `new_jobs` — matched listings recorded this run (these create `pending` history rows, then get sent to Telegram before the response comes back)\n- `skipped` — listings that failed the experience, location, or role filter (or had no detectable experience when a filter is set)\n- `seeded` — listings recorded silently on a site's **first** check (no alerts)\n- `errors` — sites that failed to fetch\n- `details` — the same numbers broken down per site\n- `notified` — `{sent, failed, skipped}` from the Telegram push: `skipped: true` means Telegram isn't configured (nothing was attempted); `failed` rows stay `pending` and are retried next time\n\nThe **first** Run now after creating a site only seeds; matches start alerting from the second run onward."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notify",
+      "item": [
+        {
+          "name": "Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/notify/status", "host": ["{{base_url}}"], "path": ["api", "notify", "status"] },
+            "description": "Returns `{\"configured\": true|false}` — whether `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are both set in the environment. Doesn't verify they're actually valid — use **Send test message** for that."
+          }
+        },
+        {
+          "name": "Send test message",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/notify/test", "host": ["{{base_url}}"], "path": ["api", "notify", "test"] },
+            "description": "Sends a one-off plain-text message to your configured chat, independent of any job data. Use this right after setting up `.env` to confirm the bot token and chat id actually work.\n\n- `400` — not configured (env vars missing)\n- `502` — configured but Telegram rejected the request (bad token, bot never messaged, wrong chat id, etc.) — `error` has Telegram's reason\n- `200 {\"ok\": true}` — check your Telegram chat, the message should have arrived"
+          }
+        },
+        {
+          "name": "Retry pending",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/notify", "host": ["{{base_url}}"], "path": ["api", "notify"] },
+            "description": "Re-attempts delivery for every match still `pending` in `/api/history` (e.g. Telegram was down, or you've only just configured it after some matches piled up). Same `{sent, failed, skipped}` shape as the `notified` field on Run now. Safe to call anytime — already-`sent` rows aren't touched."
           }
         }
       ]

@@ -10,12 +10,11 @@ them), and which roles you want (e.g. `Engineering`, `Software Developer`).
 CronFetch fetches the page, auto-detects the CSS selector for the job cards,
 and from then on — every 15 minutes — pulls out the individual listings, reads
 the experience requirement, location, and role from each one's text, and logs
-the **new** listings where **every filter you set** passes. Listings that fail
-any one of them, or that don't state an experience requirement when an
-experience filter is set, are ignored.
+the **new** listings where **every filter you set** passes, and pushes each one
+to Telegram. Listings that fail any one of them, or that don't state an
+experience requirement when an experience filter is set, are ignored.
 
-This repo is the backend only. A React dashboard and a Telegram notifier are
-planned to sit in front of it.
+This repo is the backend only. A React dashboard is planned to sit in front of it.
 
 ## How it works
 
@@ -27,7 +26,8 @@ React frontend  ──HTTP──▶  Flask API  ──▶  SQLite (instance/cron
                                      ├─ auto-detect job-card selector (first time)
                                      ├─ extract job cards (BeautifulSoup)
                                      ├─ parse experience + location + role from card text
-                                     └─ store new matches → jobs + history
+                                     ├─ store new matches → jobs + history (status=pending)
+                                     └─ notifier.send_pending() → Telegram (status=sent)
 ```
 
 - **`app.py`** – app factory, CORS, `/health`, starts the background scheduler.
@@ -41,7 +41,9 @@ React frontend  ──HTTP──▶  Flask API  ──▶  SQLite (instance/cron
 - **`location.py`** – `parse_locations(raw)` and `find_location(locations, text)`.
 - **`role.py`** – `parse_roles(raw)` and `find_role(roles, text)` (same pattern
   as `location.py`, applied to job title/department instead of location).
-- **`routes/`** – one Blueprint per resource (`sites`, `jobs`, `history`).
+- **`notifier.py`** – `send_pending(conn)`: sends every unsent match to
+  Telegram and marks it `sent`; a no-op when Telegram isn't configured.
+- **`routes/`** – one Blueprint per resource (`sites`, `jobs`, `history`, `notify`).
 - **`instance/`** – holds the SQLite file (git-ignored, created on first run).
 
 ### Selector auto-detection
@@ -122,6 +124,34 @@ The first time a site is checked, listings already on the page are stored
 silently (no notifications) so you don't get flooded when adding an established
 board. Alerts begin from the second check onward.
 
+### Telegram notifications
+
+1. Message **[@BotFather](https://t.me/BotFather)** on Telegram, send `/newbot`,
+   follow the prompts. You get back a token like `123456789:AAExampleTokenHere`.
+2. Send any message to your new bot, then open
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser and read the
+   `"chat":{"id": ...}` value — that's your chat id (a group works too, and its
+   id is negative).
+3. Copy [.env.example](.env.example) to `.env` and fill in `TELEGRAM_BOT_TOKEN`
+   and `TELEGRAM_CHAT_ID`. `.env` is git-ignored; `app.py` loads it automatically
+   via `python-dotenv`.
+4. Restart the server, then `POST /api/notify/test` to confirm delivery before
+   waiting on a real job match.
+
+Once configured, every `run_check()` — scheduled or via `/api/run-now` — ends
+by calling `notifier.send_pending()`, which sends one plain-text message per
+new match (title, experience/location/role, url) and flips its `history` row
+from `pending` to `sent`. If Telegram isn't configured, or a send fails (bad
+token, network blip, chat not started), the row is left `pending` and picked
+up automatically on the next run — nothing is lost, there's no separate retry
+queue to manage. `POST /api/notify` retries immediately instead of waiting for
+the next scheduled check; `GET /api/notify/status` reports whether the two env
+vars are set (not whether they're valid — use the test endpoint for that).
+
+Each `jobs` row insert now also writes its id onto the linked `history` row
+(`history.job_id`), which is how `send_pending()` builds a message with the
+job's actual title/url/experience/location/role instead of just the log text.
+
 ## Requirements
 
 - Python 3.11+ (developed on 3.14)
@@ -148,6 +178,11 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+Optional: copy `.env.example` to `.env` and fill in `TELEGRAM_BOT_TOKEN` /
+`TELEGRAM_CHAT_ID` (see [Telegram notifications](#telegram-notifications)
+above) if you want new matches pushed to Telegram. The app runs fine without
+it — matches just accumulate as `pending` in `/api/history` until you set it up.
 
 ## Running
 
@@ -178,8 +213,11 @@ Base URL: `http://127.0.0.1:5000`
 | `PATCH` | `/api/sites/<id>` | any subset of `name, url, css_selector, item_selector, min_experience, max_experience, locations, roles` | Edit a site (change a filter, fix the URL, set a manual selector) |
 | `DELETE` | `/api/sites/<id>` | – | Remove a site (its jobs cascade) |
 | `GET` | `/api/jobs` | – | Last 100 matched jobs, with `site_name`, `matched_location`, `matched_role` |
-| `GET` | `/api/history` | – | Last 200 check/notification log rows |
-| `POST` | `/api/run-now` | – | Run `run_check()` immediately |
+| `GET` | `/api/history` | – | Last 200 check/notification log rows (`job_id` links a match to its job) |
+| `POST` | `/api/run-now` | – | Run `run_check()` immediately, then push new matches to Telegram; response includes a `notified` summary |
+| `GET` | `/api/notify/status` | – | `{"configured": bool}` — are `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` set |
+| `POST` | `/api/notify/test` | – | Send a one-off test message; 400 if unconfigured, 502 if Telegram rejects it |
+| `POST` | `/api/notify` | – | Retry any match still `pending` right now, instead of waiting for the next check |
 
 `min_experience`/`max_experience` are whole numbers of years describing your
 band (see the table above for how a single bound behaves); `min_experience`
@@ -221,12 +259,15 @@ cron-fetch/
 ├── experience.py       # experience parsing / matching
 ├── location.py         # location filter parsing / matching
 ├── role.py             # role/title filter parsing / matching
+├── notifier.py         # Telegram delivery (send_pending, send_message)
 ├── routes/
 │   ├── __init__.py     # exposes `blueprints`
 │   ├── sites.py
 │   ├── jobs.py
-│   └── history.py
+│   ├── history.py
+│   └── notify.py
 ├── instance/           # SQLite file lives here (git-ignored)
+├── .env.example        # Telegram env var template - copy to .env
 ├── requirements.txt
 └── README.md
 ```
@@ -261,6 +302,7 @@ exercise the pipeline with predictable content.
 python experience.py          # runs the experience parser + band matching against sample titles
 python location.py            # runs the location matcher against sample titles
 python role.py                # runs the role matcher against sample titles
+python notifier.py            # sends a real test message if .env is configured
 ```
 
 ### Updating dependencies
@@ -274,8 +316,8 @@ pip freeze > requirements.txt
 
 - No auth — bind to localhost or put it behind a reverse proxy.
 - Dev server only; use a WSGI server (gunicorn/waitress) for anything real.
-- Telegram notifications: `history` rows are written with `status="pending"` but
-  nothing sends them yet.
+- No `/api/settings` endpoint yet — Telegram credentials are environment
+  variables, not something you can change through the API.
 - A site with no usable selector (JS-rendered / bad URL) logs a `history` error
   on every scheduled run until fixed — no back-off yet.
 - Experience is parsed from the **listing card** text only; sites that show years

@@ -2,12 +2,15 @@
 import atexit
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import CORS
 
-from database import init_db
-from routes import blueprints
-from scraper import run_check
+load_dotenv()  # before other imports, so TELEGRAM_* is set when they read it
+
+from database import init_db  # noqa: E402
+from routes import blueprints  # noqa: E402
+from scraper import run_check  # noqa: E402
 
 CHECK_INTERVAL_MINUTES = 15
 

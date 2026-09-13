@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS history (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     message TEXT NOT NULL,
     sent_at TEXT NOT NULL DEFAULT (datetime('now')),
-    status  TEXT
+    status  TEXT,
+    job_id  INTEGER REFERENCES jobs(id) ON DELETE SET NULL
 );
 """
 
@@ -66,6 +67,9 @@ MIGRATIONS = {
         ("experience_max", "ALTER TABLE jobs ADD COLUMN experience_max REAL"),
         ("matched_location", "ALTER TABLE jobs ADD COLUMN matched_location TEXT"),
         ("matched_role", "ALTER TABLE jobs ADD COLUMN matched_role TEXT"),
+    ],
+    "history": [
+        ("job_id", "ALTER TABLE history ADD COLUMN job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL"),
     ],
 }
 

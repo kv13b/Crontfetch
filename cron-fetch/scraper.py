@@ -4,7 +4,8 @@ For each site we pull individual job listings, read the experience requirement,
 location, and role from each listing's text, and record only the new ones that
 match the site's `min_experience`/`max_experience` band, `locations`, and
 `roles` filters (all must pass). Listings that fail any one of them are
-skipped.
+skipped. Once a run finishes, notifier.send_pending() pushes any new matches
+to Telegram (a no-op if it isn't configured).
 """
 import datetime as dt
 import hashlib
@@ -14,6 +15,7 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
+import notifier
 from database import get_connection
 from detect import detect_listings
 from experience import experience_matches, parse_experience
@@ -28,9 +30,10 @@ def _utcnow():
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
 
 
-def _log(conn, message, status):
+def _log(conn, message, status, job_id=None):
     conn.execute(
-        "INSERT INTO history (message, status) VALUES (?, ?)", (message, status)
+        "INSERT INTO history (message, status, job_id) VALUES (?, ?, ?)",
+        (message, status, job_id),
     )
 
 
@@ -168,7 +171,7 @@ def check_site(conn, site):
             continue
 
         emin, emax = parsed if parsed else (None, None)
-        conn.execute(
+        cur = conn.execute(
             "INSERT INTO jobs (site_id, title, url, job_key, experience_min, experience_max, "
             "matched_location, matched_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (site["id"], title, job_url, key, emin, emax, matched_location, matched_role),
@@ -176,7 +179,7 @@ def check_site(conn, site):
         if first_run:
             result["seeded"] += 1  # existing listings recorded silently, no notification
         else:
-            _log(conn, f"New match on {site['name']}: {title[:120]}", "pending")
+            _log(conn, f"New match on {site['name']}: {title[:120]}", "pending", job_id=cur.lastrowid)
             result["new"] += 1
 
     conn.execute(
@@ -194,11 +197,12 @@ def check_site(conn, site):
 
 
 def run_check():
-    """Check every site once."""
+    """Check every site once, then push any new matches to Telegram."""
     conn = get_connection()
     try:
         sites = conn.execute("SELECT * FROM sites").fetchall()
         per_site = [check_site(conn, site) for site in sites]
+        notified = notifier.send_pending(conn)
         return {
             "sites": len(sites),
             "new_jobs": sum(s["new"] for s in per_site),
@@ -206,6 +210,7 @@ def run_check():
             "seeded": sum(s["seeded"] for s in per_site),
             "errors": sum(1 for s in per_site if s["error"]),
             "details": per_site,
+            "notified": notified,
         }
     finally:
         conn.close()
