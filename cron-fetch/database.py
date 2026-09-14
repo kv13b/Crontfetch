@@ -4,7 +4,9 @@ import sqlite3
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
-DB_PATH = os.path.join(INSTANCE_DIR, "cronfetch.db")
+# Override with CRONFETCH_DB_PATH to point at a persistent disk in hosted
+# environments (e.g. Render) where the app's own directory isn't durable.
+DB_PATH = os.environ.get("CRONFETCH_DB_PATH") or os.path.join(INSTANCE_DIR, "cronfetch.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sites (
@@ -76,7 +78,7 @@ MIGRATIONS = {
 
 def get_connection():
     """Return a new SQLite connection with Row access and FK enforcement."""
-    os.makedirs(INSTANCE_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")

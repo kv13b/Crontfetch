@@ -200,6 +200,50 @@ Health check:
 curl http://127.0.0.1:5000/health      # {"status": "online"}
 ```
 
+## Deploying to Render
+
+Render needs to pull from a git host — this repo already has a remote
+(`origin` → `github.com/kv13b/Crontfetch.git`); push your branch there first.
+Note the git repo root is the **parent** folder (`job-fetcher`), with this app
+in the `cron-fetch` subdirectory — that's why **Root Directory** matters below.
+
+**Option A — manual (first deploy, most transparent):**
+
+1. [dashboard.render.com](https://dashboard.render.com) → **New +** → **Web Service** → connect the `kv13b/Crontfetch` repo.
+2. **Root Directory**: `cron-fetch`
+3. **Runtime**: Python 3
+4. **Build Command**: `pip install -r requirements.txt`
+5. **Start Command**: `gunicorn app:app --worker-class gthread --workers 1 --threads 4 --bind 0.0.0.0:$PORT`
+6. **Health Check Path**: `/health`
+7. Under **Environment**, add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` with your real values (this is the hosted equivalent of your local `.env` — that file itself is git-ignored and never reaches Render).
+8. **Create Web Service**. Once it deploys, `https://<your-service>.onrender.com/health` should return `{"status": "online"}`.
+
+**Option B — Blueprint (repeatable, uses the included [render.yaml](render.yaml)):**
+**New +** → **Blueprint** → select the repo → Render reads `render.yaml` and pre-fills everything above → fill in the two secret env vars it prompts for (marked `sync: false`) → **Apply**.
+
+### Read this before you rely on it
+
+- **`--workers 1` is not optional.** `run_check()`'s scheduler starts once per
+  process when `app.py` is imported (see the comment above `start_scheduler()`
+  in `app.py`). More workers means the same check running that many times in
+  parallel against the same SQLite file. Scale by upgrading the instance size,
+  not the worker count, unless you first move the scheduler out of the web
+  process and off SQLite.
+- **Free-tier storage is not persistent.** Without an attached Render Disk
+  (a paid feature), the filesystem resets on every deploy — every site, job,
+  and history row you've collected is gone. `database.py` supports
+  `CRONFETCH_DB_PATH` for exactly this: on a paid plan, attach a Disk, set
+  `CRONFETCH_DB_PATH` to a path under its mount, and the DB survives deploys
+  (`render.yaml` has this commented out, ready to enable).
+- **Free web services spin down after 15 minutes idle** and only wake on an
+  incoming HTTP request. While asleep, the in-process scheduler isn't running
+  either — your 15-minute checks silently stop until something hits the URL.
+  This defeats the point of a background job-checker. Free tier is fine for
+  poking at the API by hand (Postman, `curl .../api/run-now`); for it to
+  actually run unattended you need an always-on (paid) instance, or an
+  external scheduler hitting `/api/run-now` on a cadence instead of relying on
+  the in-app one.
+
 ## API
 
 Base URL: `http://127.0.0.1:5000`
@@ -268,6 +312,8 @@ cron-fetch/
 │   └── notify.py
 ├── instance/           # SQLite file lives here (git-ignored)
 ├── .env.example        # Telegram env var template - copy to .env
+├── Procfile            # gunicorn start command (Render/Heroku-style)
+├── render.yaml         # optional Render Blueprint
 ├── requirements.txt
 └── README.md
 ```
@@ -315,7 +361,10 @@ pip freeze > requirements.txt
 ### Notes / not done yet
 
 - No auth — bind to localhost or put it behind a reverse proxy.
-- Dev server only; use a WSGI server (gunicorn/waitress) for anything real.
+- Dev server (`python app.py`) is for local use only; gunicorn + the Procfile
+  is what actually runs in production (see "Deploying to Render" above), and
+  that section's caveats about disk persistence and free-tier sleep apply
+  wherever this ends up hosted, not just Render.
 - No `/api/settings` endpoint yet — Telegram credentials are environment
   variables, not something you can change through the API.
 - A site with no usable selector (JS-rendered / bad URL) logs a `history` error

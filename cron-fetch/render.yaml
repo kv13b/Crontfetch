@@ -1,0 +1,29 @@
+# Render Blueprint - lets you deploy via "New +" -> "Blueprint" instead of
+# clicking through every field by hand. Optional; manual setup works too
+# (see the "Deploying to Render" section in README.md).
+services:
+  - type: web
+    name: cronfetch-api
+    runtime: python
+    rootDir: cron-fetch
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --worker-class gthread --workers 1 --threads 4 --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.12.6
+    # Free plan has no persistent disk - instance/cronfetch.db is wiped on every
+    # deploy and on every free-tier spin-down. Uncomment on a paid plan and set
+    # CRONFETCH_DB_PATH below to the mount path to keep data across deploys.
+    # disk:
+    #   name: cronfetch-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    # envVars (add alongside the ones above):
+    #   - key: CRONFETCH_DB_PATH
+    #     value: /var/data/cronfetch.db

@@ -32,6 +32,10 @@ def create_app():
 
 
 def start_scheduler():
+    # Runs in-process, in a background thread of whatever process imports this
+    # module. Under gunicorn that means exactly one worker (see Procfile) -
+    # scaling workers without moving this out of the web process would run the
+    # check that many times in parallel, once per worker.
     scheduler = BackgroundScheduler(daemon=True, timezone="UTC")
     scheduler.add_job(
         run_check,
