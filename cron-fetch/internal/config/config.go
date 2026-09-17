@@ -13,6 +13,7 @@ type Config struct {
 	DatabaseURL      string
 	TelegramBotToken string
 	TelegramChatID   string
+	JWTSecret        string
 }
 
 // Load reads .env (if present) into the process environment, then builds a Config.
@@ -25,10 +26,14 @@ func Load() (Config, error) {
 		DatabaseURL:      os.Getenv("DATABASE_URL"),
 		TelegramBotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
 		TelegramChatID:   os.Getenv("TELEGRAM_CHAT_ID"),
+		JWTSecret:        os.Getenv("JWT_SECRET"),
 	}
 
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is not set")
+	}
+	if cfg.JWTSecret == "" {
+		return Config{}, fmt.Errorf("JWT_SECRET is not set")
 	}
 
 	return cfg, nil
