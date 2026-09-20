@@ -28,6 +28,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", handlers.Health(pool))
 	mux.HandleFunc("POST /signup", handlers.Signup(pool, cfg.JWTSecret))
+	mux.HandleFunc("POST /login", handlers.Login(pool, cfg.JWTSecret))
 
 	addr := ":8080"
 	log.Printf("CronFetch listening on %s", addr)
