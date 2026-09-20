@@ -3,6 +3,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,6 +16,7 @@ func Health(pool *pgxpool.Pool) http.HandlerFunc {
 		dbStatus := "online"
 		if err := pool.Ping(r.Context()); err != nil {
 			dbStatus = "unreachable"
+			slog.Error("health: db ping failed", "error", err)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

@@ -3,27 +3,34 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/kv13b/Crontfetch/internal/config"
 	"github.com/kv13b/Crontfetch/internal/db"
 	"github.com/kv13b/Crontfetch/internal/handlers"
+	"github.com/kv13b/Crontfetch/internal/middleware"
 )
 
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	slog.SetDefault(logger)
+
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("loading config: %v", err)
+		slog.Error("loading config", "error", err)
+		os.Exit(1)
 	}
 
 	ctx := context.Background()
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("connecting to database: %v", err)
+		slog.Error("connecting to database", "error", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
-	log.Println("connected to database")
+	slog.Info("connected to database")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", handlers.Health(pool))
@@ -31,8 +38,9 @@ func main() {
 	mux.HandleFunc("POST /login", handlers.Login(pool, cfg.JWTSecret))
 
 	addr := ":8080"
-	log.Printf("CronFetch listening on %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatal(err)
+	slog.Info("CronFetch listening", "addr", addr)
+	if err := http.ListenAndServe(addr, middleware.Logging(mux)); err != nil {
+		slog.Error("server stopped", "error", err)
+		os.Exit(1)
 	}
 }

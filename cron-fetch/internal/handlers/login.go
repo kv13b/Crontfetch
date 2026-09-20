@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -38,23 +39,29 @@ func Login(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 		user, passwordHash, err := getUserByEmail(r.Context(), pool, req.Email)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
+				slog.Warn("login: unknown email", "email", req.Email)
 				writeError(w, http.StatusUnauthorized, "invalid email or password")
 				return
 			}
+			slog.Error("login: looking up user", "error", err)
 			writeError(w, http.StatusInternalServerError, "could not look up user")
 			return
 		}
 
 		if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
+			slog.Warn("login: wrong password", "email", req.Email)
 			writeError(w, http.StatusUnauthorized, "invalid email or password")
 			return
 		}
 
 		token, err := jwt.GenerateToken(user.ID, user.Email, jwtSecret, tokenTTL)
 		if err != nil {
+			slog.Error("login: generating token", "error", err, "user_id", user.ID)
 			writeError(w, http.StatusInternalServerError, "could not generate token")
 			return
 		}
+
+		slog.Info("login: success", "user_id", user.ID, "email", user.Email)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

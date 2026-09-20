@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -57,6 +58,7 @@ func Signup(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 
 		passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
+			slog.Error("signup: hashing password", "error", err)
 			writeError(w, http.StatusInternalServerError, "could not process password")
 			return
 		}
@@ -65,18 +67,23 @@ func Signup(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == postgresUniqueViolation {
+				slog.Warn("signup: duplicate email", "email", req.Email)
 				writeError(w, http.StatusConflict, "email is already registered")
 				return
 			}
+			slog.Error("signup: inserting user", "error", err)
 			writeError(w, http.StatusInternalServerError, "could not create user")
 			return
 		}
 
 		token, err := jwt.GenerateToken(user.ID, user.Email, jwtSecret, tokenTTL)
 		if err != nil {
+			slog.Error("signup: generating token", "error", err, "user_id", user.ID)
 			writeError(w, http.StatusInternalServerError, "could not generate token")
 			return
 		}
+
+		slog.Info("signup: user created", "user_id", user.ID, "email", user.Email)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
