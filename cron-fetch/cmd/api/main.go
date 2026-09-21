@@ -36,6 +36,7 @@ func main() {
 	mux.HandleFunc("GET /health", handlers.Health(pool))
 	mux.HandleFunc("POST /signup", handlers.Signup(pool, cfg.JWTSecret))
 	mux.HandleFunc("POST /login", handlers.Login(pool, cfg.JWTSecret))
+	mux.Handle("GET /me", middleware.Auth(cfg.JWTSecret)(handlers.Me(pool)))
 
 	addr := ":8080"
 	slog.Info("CronFetch listening", "addr", addr)
