@@ -4,6 +4,7 @@ package fetcher
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -17,13 +18,25 @@ type Job struct {
 	URL      string
 }
 
-const paloAltoSearchURL = "https://jobs.paloaltonetworks.com/en/search-jobs"
+// FetchTalentBrewJobs scrapes the first page of search results (~15 jobs)
+// from a career page built on the TalentBrew/Radancy platform (identified
+// by markup like Palo Alto Networks' career site). careerURL is the base
+// career page, e.g. "https://jobs.paloaltonetworks.com/en" — the search
+// results page and job links are derived from it, so this works for any
+// company on the same platform, not just one hardcoded site.
+//
+// It's scoped to page one for now; paginating through all listings is a
+// follow-up.
+func FetchTalentBrewJobs(careerURL string) ([]Job, error) {
+	base, err := url.Parse(careerURL)
+	if err != nil {
+		return nil, fmt.Errorf("parsing career URL: %w", err)
+	}
+	origin := base.Scheme + "://" + base.Host
 
-// FetchPaloAltoJobs scrapes the first page of Palo Alto Networks' career
-// site search results (~15 jobs). It's scoped to page one for now;
-// paginating through all listings is a follow-up.
-func FetchPaloAltoJobs() ([]Job, error) {
-	req, err := http.NewRequest(http.MethodGet, paloAltoSearchURL, nil)
+	searchURL := strings.TrimRight(careerURL, "/") + "/search-jobs"
+
+	req, err := http.NewRequest(http.MethodGet, searchURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("building request: %w", err)
 	}
@@ -56,7 +69,7 @@ func FetchPaloAltoJobs() ([]Job, error) {
 			ID:       id,
 			Title:    strings.TrimSpace(link.Find("h2.section29__search-results-job-title").Text()),
 			Location: strings.TrimSpace(link.Find("span.section29__result-location").Text()),
-			URL:      "https://jobs.paloaltonetworks.com" + href,
+			URL:      origin + href,
 		})
 	})
 

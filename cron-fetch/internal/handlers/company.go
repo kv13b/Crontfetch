@@ -16,12 +16,17 @@ import (
 )
 
 type createCompanyRequest struct {
-	Name      string `json:"name"`
-	CareerURL string `json:"career_url"`
+	Name               string   `json:"name"`
+	CareerURL          string   `json:"career_url"`
+	MinExperienceYears *int     `json:"min_experience_years"`
+	MaxExperienceYears *int     `json:"max_experience_years"`
+	Roles              []string `json:"roles"`
+	Locations          []string `json:"locations"`
 }
 
 // CreateCompany handles POST /companies: adds a career page for the
-// authenticated user to track.
+// authenticated user to track, along with the filters that decide which
+// of its jobs are actually relevant to them.
 func CreateCompany(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := middleware.ClaimsFromContext(r.Context())
@@ -47,7 +52,31 @@ func CreateCompany(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		company, err := insertCompany(r.Context(), pool, claims.UserID, req.Name, req.CareerURL)
+		if req.MinExperienceYears != nil && *req.MinExperienceYears < 0 {
+			writeError(w, http.StatusBadRequest, "min_experience_years cannot be negative")
+			return
+		}
+		if req.MaxExperienceYears != nil && *req.MaxExperienceYears < 0 {
+			writeError(w, http.StatusBadRequest, "max_experience_years cannot be negative")
+			return
+		}
+		if req.MinExperienceYears != nil && req.MaxExperienceYears != nil && *req.MinExperienceYears > *req.MaxExperienceYears {
+			writeError(w, http.StatusBadRequest, "min_experience_years cannot be greater than max_experience_years")
+			return
+		}
+
+		roles := cleanStrings(req.Roles)
+		locations := cleanStrings(req.Locations)
+
+		company, err := insertCompany(r.Context(), pool, newCompanyInput{
+			UserID:             claims.UserID,
+			Name:               req.Name,
+			CareerURL:          req.CareerURL,
+			MinExperienceYears: req.MinExperienceYears,
+			MaxExperienceYears: req.MaxExperienceYears,
+			Roles:              roles,
+			Locations:          locations,
+		})
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == postgresUniqueViolation {
@@ -89,23 +118,51 @@ func ListCompanies(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func insertCompany(ctx context.Context, pool *pgxpool.Pool, userID, name, careerURL string) (models.Company, error) {
+// cleanStrings trims whitespace from each entry and drops any that end up
+// empty, so callers never have to deal with "" or "  " sneaking into a
+// roles/locations filter.
+func cleanStrings(values []string) []string {
+	cleaned := make([]string, 0, len(values))
+	for _, v := range values {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			cleaned = append(cleaned, v)
+		}
+	}
+	return cleaned
+}
+
+type newCompanyInput struct {
+	UserID             string
+	Name               string
+	CareerURL          string
+	MinExperienceYears *int
+	MaxExperienceYears *int
+	Roles              []string
+	Locations          []string
+}
+
+func insertCompany(ctx context.Context, pool *pgxpool.Pool, in newCompanyInput) (models.Company, error) {
 	const query = `
-		INSERT INTO companies (user_id, name, career_url)
-		VALUES ($1, $2, $3)
-		RETURNING id, user_id, name, career_url, created_at, updated_at
+		INSERT INTO companies (user_id, name, career_url, min_experience_years, max_experience_years, roles, locations)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, user_id, name, career_url, min_experience_years, max_experience_years, roles, locations, created_at, updated_at
 	`
 
 	var c models.Company
-	err := pool.QueryRow(ctx, query, userID, name, careerURL).Scan(
-		&c.ID, &c.UserID, &c.Name, &c.CareerURL, &c.CreatedAt, &c.UpdatedAt,
+	err := pool.QueryRow(ctx, query,
+		in.UserID, in.Name, in.CareerURL, in.MinExperienceYears, in.MaxExperienceYears, in.Roles, in.Locations,
+	).Scan(
+		&c.ID, &c.UserID, &c.Name, &c.CareerURL,
+		&c.MinExperienceYears, &c.MaxExperienceYears, &c.Roles, &c.Locations,
+		&c.CreatedAt, &c.UpdatedAt,
 	)
 	return c, err
 }
 
 func listCompaniesByUser(ctx context.Context, pool *pgxpool.Pool, userID string) ([]models.Company, error) {
 	const query = `
-		SELECT id, user_id, name, career_url, created_at, updated_at
+		SELECT id, user_id, name, career_url, min_experience_years, max_experience_years, roles, locations, created_at, updated_at
 		FROM companies
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -120,7 +177,11 @@ func listCompaniesByUser(ctx context.Context, pool *pgxpool.Pool, userID string)
 	companies := make([]models.Company, 0)
 	for rows.Next() {
 		var c models.Company
-		if err := rows.Scan(&c.ID, &c.UserID, &c.Name, &c.CareerURL, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(
+			&c.ID, &c.UserID, &c.Name, &c.CareerURL,
+			&c.MinExperienceYears, &c.MaxExperienceYears, &c.Roles, &c.Locations,
+			&c.CreatedAt, &c.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		companies = append(companies, c)

@@ -2,16 +2,16 @@ package fetcher
 
 import "testing"
 
-// TestFetchPaloAltoJobs hits the real career site. It's here to manually
+// TestFetchTalentBrewJobs hits the real career site. It's here to manually
 // verify the scraper still matches the site's current markup, not as part
 // of routine CI (a layout change on their end would break this).
-func TestFetchPaloAltoJobs(t *testing.T) {
-	jobs, err := FetchPaloAltoJobs()
+func TestFetchTalentBrewJobs(t *testing.T) {
+	jobs, err := FetchTalentBrewJobs("https://jobs.paloaltonetworks.com/en")
 	if err != nil {
-		t.Fatalf("FetchPaloAltoJobs() error = %v", err)
+		t.Fatalf("FetchTalentBrewJobs() error = %v", err)
 	}
 	if len(jobs) == 0 {
-		t.Fatal("FetchPaloAltoJobs() returned no jobs")
+		t.Fatal("FetchTalentBrewJobs() returned no jobs")
 	}
 
 	for _, j := range jobs {
