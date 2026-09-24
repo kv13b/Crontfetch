@@ -1,23 +1,40 @@
 package fetcher
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"testing"
+)
 
-// TestFetchTalentBrewJobs hits the real career site. It's here to manually
-// verify the scraper still matches the site's current markup, not as part
-// of routine CI (a layout change on their end would break this).
+// The tests below hit real career sites. They're here to manually verify
+// the scraper still matches the sites' current markup, not for routine CI
+// (a layout change on their end would break them).
+
 func TestFetchTalentBrewJobs(t *testing.T) {
-	jobs, err := FetchTalentBrewJobs("https://jobs.paloaltonetworks.com/en")
+	jobs, err := FetchTalentBrewJobs(context.Background(), "https://jobs.paloaltonetworks.com/en", 3)
 	if err != nil {
 		t.Fatalf("FetchTalentBrewJobs() error = %v", err)
 	}
-	if len(jobs) == 0 {
-		t.Fatal("FetchTalentBrewJobs() returned no jobs")
+	if len(jobs) <= 15 {
+		t.Fatalf("expected more than one page of jobs (15), got %d", len(jobs))
 	}
 
+	seen := make(map[string]bool)
 	for _, j := range jobs {
-		t.Logf("%s | %s | %s | %s", j.ID, j.Title, j.Location, j.URL)
 		if j.ID == "" || j.Title == "" || j.URL == "" {
 			t.Errorf("job missing fields: %+v", j)
 		}
+		if seen[j.ID] {
+			t.Errorf("duplicate job ID %s: pages overlapped", j.ID)
+		}
+		seen[j.ID] = true
+	}
+	t.Logf("fetched %d unique jobs across 3 pages", len(jobs))
+}
+
+func TestFetchTalentBrewJobs_UnsupportedSite(t *testing.T) {
+	_, err := FetchTalentBrewJobs(context.Background(), "https://example.com/careers", 1)
+	if !errors.Is(err, ErrUnsupportedPlatform) {
+		t.Errorf("error = %v, want ErrUnsupportedPlatform", err)
 	}
 }
