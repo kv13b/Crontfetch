@@ -54,10 +54,17 @@ func CompanyJobs(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		jobs, err := fetcher.FetchTalentBrewJobs(r.Context(), company.CareerURL, maxPagesPerFetch)
+		jobs, err := fetcher.FetchJobs(r.Context(), company.CareerURL, company.Platform, company.Board, maxPagesPerFetch)
 		if err != nil {
-			if errors.Is(err, fetcher.ErrUnsupportedPlatform) {
-				writeError(w, http.StatusUnprocessableEntity, "this career page isn't supported yet — only TalentBrew-based career sites can be read right now")
+			switch {
+			case errors.Is(err, fetcher.ErrUnsupportedPlatform):
+				writeError(w, http.StatusUnprocessableEntity, "this career page isn't supported yet — only TalentBrew and Greenhouse career sites can be read right now")
+				return
+			case errors.Is(err, fetcher.ErrMissingBoard):
+				writeError(w, http.StatusUnprocessableEntity, "this company has no greenhouse board name saved")
+				return
+			case errors.Is(err, fetcher.ErrBoardNotFound):
+				writeError(w, http.StatusUnprocessableEntity, "no greenhouse job board found with the saved board name")
 				return
 			}
 			slog.Error("company jobs: fetching", "error", err, "company_id", company.ID, "career_url", company.CareerURL)
@@ -87,16 +94,10 @@ func CompanyJobs(pool *pgxpool.Pool) http.HandlerFunc {
 // company looks exactly like asking for one that doesn't exist.
 func getCompanyByID(ctx context.Context, pool *pgxpool.Pool, userID, id string) (models.Company, error) {
 	const query = `
-		SELECT id, user_id, name, career_url, min_experience_years, max_experience_years, roles, locations, created_at, updated_at
+		SELECT ` + companyColumns + `
 		FROM companies
 		WHERE id = $1 AND user_id = $2
 	`
 
-	var c models.Company
-	err := pool.QueryRow(ctx, query, id, userID).Scan(
-		&c.ID, &c.UserID, &c.Name, &c.CareerURL,
-		&c.MinExperienceYears, &c.MaxExperienceYears, &c.Roles, &c.Locations,
-		&c.CreatedAt, &c.UpdatedAt,
-	)
-	return c, err
+	return scanCompany(pool.QueryRow(ctx, query, id, userID))
 }

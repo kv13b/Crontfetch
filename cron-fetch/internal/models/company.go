@@ -9,6 +9,8 @@ type Company struct {
 	UserID             string    `json:"-"`
 	Name               string    `json:"name"`
 	CareerURL          string    `json:"career_url"`
+	Platform           string    `json:"platform"`
+	Board              string    `json:"board"`
 	MinExperienceYears *int      `json:"min_experience_years"`
 	MaxExperienceYears *int      `json:"max_experience_years"`
 	Roles              []string  `json:"roles"`

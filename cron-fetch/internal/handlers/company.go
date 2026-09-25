@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/kv13b/Crontfetch/internal/fetcher"
 	"github.com/kv13b/Crontfetch/internal/middleware"
 	"github.com/kv13b/Crontfetch/internal/models"
 )
@@ -18,6 +19,8 @@ import (
 type createCompanyRequest struct {
 	Name               string   `json:"name"`
 	CareerURL          string   `json:"career_url"`
+	Platform           string   `json:"platform"`
+	Board              string   `json:"board"`
 	MinExperienceYears *int     `json:"min_experience_years"`
 	MaxExperienceYears *int     `json:"max_experience_years"`
 	Roles              []string `json:"roles"`
@@ -43,6 +46,8 @@ func CreateCompany(pool *pgxpool.Pool) http.HandlerFunc {
 
 		req.Name = strings.TrimSpace(req.Name)
 		req.CareerURL = strings.TrimSpace(req.CareerURL)
+		req.Platform = strings.ToLower(strings.TrimSpace(req.Platform))
+		req.Board = strings.TrimSpace(req.Board)
 		if req.Name == "" || req.CareerURL == "" {
 			writeError(w, http.StatusBadRequest, "name and career_url are required")
 			return
@@ -50,6 +55,21 @@ func CreateCompany(pool *pgxpool.Pool) http.HandlerFunc {
 		if !strings.HasPrefix(req.CareerURL, "http://") && !strings.HasPrefix(req.CareerURL, "https://") {
 			writeError(w, http.StatusBadRequest, "career_url must start with http:// or https://")
 			return
+		}
+
+		if req.Platform != "" && !fetcher.IsKnownPlatform(req.Platform) {
+			writeError(w, http.StatusBadRequest, "platform must be one of: talentbrew, greenhouse")
+			return
+		}
+		if req.Board != "" && req.Platform == "" {
+			writeError(w, http.StatusBadRequest, "platform is required when board is set")
+			return
+		}
+		if req.Platform == fetcher.PlatformGreenhouse && req.Board == "" {
+			if _, detected := fetcher.DetectPlatform(req.CareerURL); detected == "" {
+				writeError(w, http.StatusBadRequest, "board is required for greenhouse unless career_url is a boards.greenhouse.io link")
+				return
+			}
 		}
 
 		if req.MinExperienceYears != nil && *req.MinExperienceYears < 0 {
@@ -72,6 +92,8 @@ func CreateCompany(pool *pgxpool.Pool) http.HandlerFunc {
 			UserID:             claims.UserID,
 			Name:               req.Name,
 			CareerURL:          req.CareerURL,
+			Platform:           req.Platform,
+			Board:              req.Board,
 			MinExperienceYears: req.MinExperienceYears,
 			MaxExperienceYears: req.MaxExperienceYears,
 			Roles:              roles,
@@ -132,10 +154,30 @@ func cleanStrings(values []string) []string {
 	return cleaned
 }
 
+// companyColumns and scanCompany must stay in the same order.
+const companyColumns = `id, user_id, name, career_url, platform, board, min_experience_years, max_experience_years, roles, locations, created_at, updated_at`
+
+// rowScanner is satisfied by both pgx.Row and pgx.Rows.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanCompany(row rowScanner) (models.Company, error) {
+	var c models.Company
+	err := row.Scan(
+		&c.ID, &c.UserID, &c.Name, &c.CareerURL, &c.Platform, &c.Board,
+		&c.MinExperienceYears, &c.MaxExperienceYears, &c.Roles, &c.Locations,
+		&c.CreatedAt, &c.UpdatedAt,
+	)
+	return c, err
+}
+
 type newCompanyInput struct {
 	UserID             string
 	Name               string
 	CareerURL          string
+	Platform           string
+	Board              string
 	MinExperienceYears *int
 	MaxExperienceYears *int
 	Roles              []string
@@ -144,25 +186,19 @@ type newCompanyInput struct {
 
 func insertCompany(ctx context.Context, pool *pgxpool.Pool, in newCompanyInput) (models.Company, error) {
 	const query = `
-		INSERT INTO companies (user_id, name, career_url, min_experience_years, max_experience_years, roles, locations)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, user_id, name, career_url, min_experience_years, max_experience_years, roles, locations, created_at, updated_at
-	`
+		INSERT INTO companies (user_id, name, career_url, platform, board, min_experience_years, max_experience_years, roles, locations)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING ` + companyColumns
 
-	var c models.Company
-	err := pool.QueryRow(ctx, query,
-		in.UserID, in.Name, in.CareerURL, in.MinExperienceYears, in.MaxExperienceYears, in.Roles, in.Locations,
-	).Scan(
-		&c.ID, &c.UserID, &c.Name, &c.CareerURL,
-		&c.MinExperienceYears, &c.MaxExperienceYears, &c.Roles, &c.Locations,
-		&c.CreatedAt, &c.UpdatedAt,
-	)
-	return c, err
+	return scanCompany(pool.QueryRow(ctx, query,
+		in.UserID, in.Name, in.CareerURL, in.Platform, in.Board,
+		in.MinExperienceYears, in.MaxExperienceYears, in.Roles, in.Locations,
+	))
 }
 
 func listCompaniesByUser(ctx context.Context, pool *pgxpool.Pool, userID string) ([]models.Company, error) {
 	const query = `
-		SELECT id, user_id, name, career_url, min_experience_years, max_experience_years, roles, locations, created_at, updated_at
+		SELECT ` + companyColumns + `
 		FROM companies
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -176,12 +212,8 @@ func listCompaniesByUser(ctx context.Context, pool *pgxpool.Pool, userID string)
 
 	companies := make([]models.Company, 0)
 	for rows.Next() {
-		var c models.Company
-		if err := rows.Scan(
-			&c.ID, &c.UserID, &c.Name, &c.CareerURL,
-			&c.MinExperienceYears, &c.MaxExperienceYears, &c.Roles, &c.Locations,
-			&c.CreatedAt, &c.UpdatedAt,
-		); err != nil {
+		c, err := scanCompany(rows)
+		if err != nil {
 			return nil, err
 		}
 		companies = append(companies, c)

@@ -1,0 +1,3 @@
+ALTER TABLE companies
+    ADD COLUMN platform TEXT NOT NULL DEFAULT '',
+    ADD COLUMN board TEXT NOT NULL DEFAULT '';
