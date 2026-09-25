@@ -58,7 +58,10 @@ func CompanyJobs(pool *pgxpool.Pool) http.HandlerFunc {
 		if err != nil {
 			switch {
 			case errors.Is(err, fetcher.ErrUnsupportedPlatform):
-				writeError(w, http.StatusUnprocessableEntity, "this career page isn't supported yet — only TalentBrew and Greenhouse career sites can be read right now")
+				writeError(w, http.StatusUnprocessableEntity, "this career page isn't supported yet — only TalentBrew, Greenhouse and Workday career sites can be read right now")
+				return
+			case errors.Is(err, fetcher.ErrWorkdaySiteNotFound):
+				writeError(w, http.StatusUnprocessableEntity, "no workday career site found at the saved career_url")
 				return
 			case errors.Is(err, fetcher.ErrMissingBoard):
 				writeError(w, http.StatusUnprocessableEntity, "this company has no greenhouse board name saved")

@@ -58,8 +58,14 @@ func CreateCompany(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if req.Platform != "" && !fetcher.IsKnownPlatform(req.Platform) {
-			writeError(w, http.StatusBadRequest, "platform must be one of: talentbrew, greenhouse")
+			writeError(w, http.StatusBadRequest, "platform must be one of: talentbrew, greenhouse, workday")
 			return
+		}
+		if req.Platform == fetcher.PlatformWorkday {
+			if detected, _ := fetcher.DetectPlatform(req.CareerURL); detected != fetcher.PlatformWorkday {
+				writeError(w, http.StatusBadRequest, "career_url must be a *.myworkdayjobs.com link for workday")
+				return
+			}
 		}
 		if req.Board != "" && req.Platform == "" {
 			writeError(w, http.StatusBadRequest, "platform is required when board is set")
