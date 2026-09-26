@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,6 +16,10 @@ import (
 	"github.com/kv13b/Crontfetch/internal/middleware"
 	"github.com/kv13b/Crontfetch/internal/models"
 )
+
+// detectTimeout bounds platform detection so a slow career site can't hold
+// up saving a company.
+const detectTimeout = 20 * time.Second
 
 type createCompanyRequest struct {
 	Name               string   `json:"name"`
@@ -89,6 +94,19 @@ func CreateCompany(pool *pgxpool.Pool) http.HandlerFunc {
 		if req.MinExperienceYears != nil && req.MaxExperienceYears != nil && *req.MinExperienceYears > *req.MaxExperienceYears {
 			writeError(w, http.StatusBadRequest, "min_experience_years cannot be greater than max_experience_years")
 			return
+		}
+
+		// Work out the platform now and save it, so later job fetches don't
+		// repeat the detection. If nothing usable is found, save the company
+		// anyway; the jobs endpoint will say why it can't be read.
+		if req.Platform == "" {
+			detectCtx, cancel := context.WithTimeout(r.Context(), detectTimeout)
+			detected := fetcher.Detect(detectCtx, req.CareerURL)
+			cancel()
+			slog.Info("company: platform detection", "career_url", req.CareerURL, "platform", detected.Platform, "board", detected.Board)
+			if detected.Usable() {
+				req.Platform, req.Board = detected.Platform, detected.Board
+			}
 		}
 
 		roles := cleanStrings(req.Roles)

@@ -51,24 +51,31 @@ func DetectPlatform(careerURL string) (platform, board string) {
 }
 
 // FetchJobs picks a fetcher for the company and returns its listings.
-// platform and board are the company's saved overrides; anything empty is
-// filled in from the URL. A URL that matches no known platform is tried as
-// TalentBrew, which returns ErrUnsupportedPlatform if it isn't one either.
+// platform and board are what was saved for the company (see Detect); when
+// no platform is saved, it is detected now. If nothing is recognised, the
+// page is tried as TalentBrew, which returns ErrUnsupportedPlatform if it
+// isn't one either.
 func FetchJobs(ctx context.Context, careerURL, platform, board string, maxPages int) ([]Job, error) {
-	detectedPlatform, detectedBoard := DetectPlatform(careerURL)
 	if platform == "" {
-		platform = detectedPlatform
-	}
-	if board == "" {
-		board = detectedBoard
+		detected := Detect(ctx, careerURL)
+		platform = detected.Platform
+		if board == "" {
+			board = detected.Board
+		}
 	}
 
 	switch platform {
 	case PlatformGreenhouse:
 		return FetchGreenhouseJobs(ctx, board)
 	case PlatformWorkday:
-		return FetchWorkdayJobs(ctx, careerURL, maxPages)
-	default:
+		workdayURL := careerURL
+		if board != "" {
+			workdayURL = board
+		}
+		return FetchWorkdayJobs(ctx, workdayURL, maxPages)
+	case PlatformTalentBrew, "":
 		return FetchTalentBrewJobs(ctx, careerURL, maxPages)
+	default:
+		return nil, &UnsupportedPlatformError{Platform: platform}
 	}
 }

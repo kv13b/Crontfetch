@@ -56,15 +56,21 @@ func CompanyJobs(pool *pgxpool.Pool) http.HandlerFunc {
 
 		jobs, err := fetcher.FetchJobs(r.Context(), company.CareerURL, company.Platform, company.Board, maxPagesPerFetch)
 		if err != nil {
+			var unsupported *fetcher.UnsupportedPlatformError
 			switch {
+			case errors.As(err, &unsupported):
+				slog.Warn("company jobs: unsupported platform", "platform", unsupported.Platform, "career_url", company.CareerURL)
+				writeError(w, http.StatusUnprocessableEntity, "this career site uses "+unsupported.Platform+", which isn't supported yet — only TalentBrew, Greenhouse and Workday can be read right now")
+				return
 			case errors.Is(err, fetcher.ErrUnsupportedPlatform):
-				writeError(w, http.StatusUnprocessableEntity, "this career page isn't supported yet — only TalentBrew, Greenhouse and Workday career sites can be read right now")
+				slog.Warn("company jobs: unrecognised platform", "career_url", company.CareerURL)
+				writeError(w, http.StatusUnprocessableEntity, "couldn't recognise this career site's platform — only TalentBrew, Greenhouse and Workday can be read right now")
 				return
 			case errors.Is(err, fetcher.ErrWorkdaySiteNotFound):
 				writeError(w, http.StatusUnprocessableEntity, "no workday career site found at the saved career_url")
 				return
 			case errors.Is(err, fetcher.ErrMissingBoard):
-				writeError(w, http.StatusUnprocessableEntity, "this company has no greenhouse board name saved")
+				writeError(w, http.StatusUnprocessableEntity, "this site uses Greenhouse, but its board name couldn't be worked out — save the company with platform \"greenhouse\" and its board name")
 				return
 			case errors.Is(err, fetcher.ErrBoardNotFound):
 				writeError(w, http.StatusUnprocessableEntity, "no greenhouse job board found with the saved board name")
