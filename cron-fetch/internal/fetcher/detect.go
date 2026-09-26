@@ -31,7 +31,7 @@ func (d Detection) Usable() bool {
 	if !IsKnownPlatform(d.Platform) {
 		return false
 	}
-	return d.Platform != PlatformGreenhouse || d.Board != ""
+	return !NeedsBoard(d.Platform) || d.Board != ""
 }
 
 // UnsupportedPlatformError says which recognised vendor a career site uses
@@ -49,17 +49,27 @@ var (
 	greenhouseAPIRe   = regexp.MustCompile(`(?i)boards-api\.greenhouse\.io/v1/boards/([a-z0-9_-]+)`)
 	workdaySiteRe     = regexp.MustCompile(`(?i)https?://([a-z0-9-]+\.wd\d+\.myworkdayjobs\.com)/(?:[a-z]{2}-[A-Za-z]{2}/)?([A-Za-z0-9_-]+)`)
 
+	// Platforms whose board name (slug) appears in links, embeds or API
+	// calls on a company's page. skip holds path words that aren't a board.
+	slugPatterns = []struct {
+		platform string
+		re       *regexp.Regexp
+		skip     map[string]bool
+	}{
+		{PlatformLever, regexp.MustCompile(`(?i)(?:jobs\.lever\.co|api\.lever\.co/v0/postings)/([a-z0-9_-]+)`), nil},
+		{PlatformAshby, regexp.MustCompile(`(?i)jobs\.ashbyhq\.com/([a-z0-9_.%-]+)`), map[string]bool{"api": true}},
+		{PlatformSmartRecruiters, regexp.MustCompile(`(?i)(?:jobs|careers)\.smartrecruiters\.com/([a-z0-9_-]+)`), nil},
+		{PlatformSmartRecruiters, regexp.MustCompile(`(?i)api\.smartrecruiters\.com/v1/companies/([a-z0-9_-]+)`), nil},
+		{PlatformWorkable, regexp.MustCompile(`(?i)apply\.workable\.com/([a-z0-9_-]+)`), map[string]bool{"j": true, "api": true, "embed": true}},
+		{PlatformRecruitee, regexp.MustCompile(`(?i)([a-z0-9-]+)\.recruitee\.com`), map[string]bool{"www": true, "api": true, "app": true}},
+	}
+
 	// Vendors we recognise but can't read yet, so the user gets a precise
-	// "uses Lever" message instead of a generic failure.
+	// "uses Taleo" message instead of a generic failure.
 	unsupportedVendors = []struct {
 		name string
 		re   *regexp.Regexp
 	}{
-		{"lever", regexp.MustCompile(`(?i)jobs\.(eu\.)?lever\.co/|api\.lever\.co/`)},
-		{"ashby", regexp.MustCompile(`(?i)jobs\.ashbyhq\.com/`)},
-		{"smartrecruiters", regexp.MustCompile(`(?i)smartrecruiters\.com/`)},
-		{"workable", regexp.MustCompile(`(?i)apply\.workable\.com/`)},
-		{"recruitee", regexp.MustCompile(`(?i)\.recruitee\.com`)},
 		{"teamtailor", regexp.MustCompile(`(?i)\.teamtailor\.com`)},
 		{"personio", regexp.MustCompile(`(?i)\.jobs\.personio\.`)},
 		{"jobvite", regexp.MustCompile(`(?i)jobs\.jobvite\.com`)},
@@ -111,6 +121,11 @@ func scanPage(html string) Detection {
 		return Detection{Platform: PlatformTalentBrew}
 	}
 
+	// A BeeSite front-end names its own job API in its page config.
+	if m := beeSiteAPIRe.FindStringSubmatch(html); m != nil {
+		return Detection{Platform: PlatformBeeSite, Board: strings.TrimRight(m[1], "/")}
+	}
+
 	for _, re := range []*regexp.Regexp{greenhouseAPIRe, greenhouseBoardRe} {
 		for _, m := range re.FindAllStringSubmatch(html, -1) {
 			if board := strings.ToLower(m[1]); board != "embed" && board != "v1" {
@@ -125,6 +140,14 @@ func scanPage(html string) Detection {
 			continue
 		}
 		return Detection{Platform: PlatformWorkday, Board: "https://" + strings.ToLower(m[1]) + "/" + m[2]}
+	}
+
+	for _, p := range slugPatterns {
+		for _, m := range p.re.FindAllStringSubmatch(html, -1) {
+			if !p.skip[strings.ToLower(m[1])] {
+				return Detection{Platform: p.platform, Board: m[1]}
+			}
+		}
 	}
 
 	// Greenhouse's job-link tracking parameter, without a visible board name.

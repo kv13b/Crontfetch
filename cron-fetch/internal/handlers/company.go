@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -63,7 +64,7 @@ func CreateCompany(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if req.Platform != "" && !fetcher.IsKnownPlatform(req.Platform) {
-			writeError(w, http.StatusBadRequest, "platform must be one of: talentbrew, greenhouse, workday")
+			writeError(w, http.StatusBadRequest, "platform must be one of: talentbrew, greenhouse, workday, lever, ashby, smartrecruiters, workable, recruitee, beesite")
 			return
 		}
 		if req.Platform == fetcher.PlatformWorkday {
@@ -76,9 +77,15 @@ func CreateCompany(pool *pgxpool.Pool) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "platform is required when board is set")
 			return
 		}
-		if req.Platform == fetcher.PlatformGreenhouse && req.Board == "" {
-			if _, detected := fetcher.DetectPlatform(req.CareerURL); detected == "" {
-				writeError(w, http.StatusBadRequest, "board is required for greenhouse unless career_url is a boards.greenhouse.io link")
+		if req.Platform == fetcher.PlatformBeeSite && req.Board != "" {
+			if u, err := url.Parse(req.Board); err != nil || u.Scheme != "https" || u.Host == "" {
+				writeError(w, http.StatusBadRequest, "board must be the BeeSite API address, e.g. https://jobs.api.example.com")
+				return
+			}
+		}
+		if fetcher.NeedsBoard(req.Platform) && req.Board == "" {
+			if p, b := fetcher.DetectPlatform(req.CareerURL); p != req.Platform || b == "" {
+				writeError(w, http.StatusBadRequest, "board is required for "+req.Platform+" unless career_url is that platform's own job board link")
 				return
 			}
 		}

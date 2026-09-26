@@ -23,7 +23,17 @@ func TestScanPage(t *testing.T) {
 		{"workday asset path ignored", `<script src="https://acme.wd5.myworkdayjobs.com/assets/app.js">`, Detection{}},
 		{"talentbrew", `<link href="//tbcdn.talentbrew.com/company/1/css/a.css">`, Detection{Platform: PlatformTalentBrew}},
 		{"talentbrew outranks a workday link", `<link href="//tbcdn.talentbrew.com/a.css"><a href="https://acme.wd5.myworkdayjobs.com/en-US/Other/x">`, Detection{Platform: PlatformTalentBrew}},
-		{"known but unsupported vendor", `<a href="https://jobs.lever.co/acme/123">`, Detection{Platform: "lever"}},
+		{"lever job link", `<a href="https://jobs.lever.co/spotify/2193db3f">`, Detection{PlatformLever, "spotify"}},
+		{"lever api call", `fetch("https://api.lever.co/v0/postings/spotify?mode=json")`, Detection{PlatformLever, "spotify"}},
+		{"ashby board", `<a href="https://jobs.ashbyhq.com/linear/d3bc1ced">`, Detection{PlatformAshby, "linear"}},
+		{"ashby api path isn't a board", `<script src="https://jobs.ashbyhq.com/api/x.js"></script>`, Detection{}},
+		{"smartrecruiters careers link", `<a href="https://careers.smartrecruiters.com/BoschGroup">`, Detection{PlatformSmartRecruiters, "BoschGroup"}},
+		{"smartrecruiters api", `https://api.smartrecruiters.com/v1/companies/BoschGroup/postings`, Detection{PlatformSmartRecruiters, "BoschGroup"}},
+		{"workable board", `<a href="https://apply.workable.com/huggingface/j/F4C096B22E/">`, Detection{PlatformWorkable, "huggingface"}},
+		{"workable job path isn't a board", `<a href="https://apply.workable.com/j/F4C096B22E">`, Detection{}},
+		{"recruitee subdomain", `<a href="https://bunq.recruitee.com/o/legal-counsel">`, Detection{PlatformRecruitee, "bunq"}},
+		{"recruitee www isn't a board", `<a href="https://www.recruitee.com/pricing">`, Detection{}},
+		{"known but unsupported vendor", `<a href="https://acme.taleo.net/careersection/2/jobsearch.ftl">`, Detection{Platform: "taleo"}},
 		{"nothing recognisable", `<html><body>Careers at Acme</body></html>`, Detection{}},
 	}
 	for _, tt := range tests {
@@ -131,24 +141,24 @@ func TestDetect_FromPage(t *testing.T) {
 
 func TestDetect_UnsupportedVendorIsNotOverriddenByGuess(t *testing.T) {
 	fakeGreenhouse(t)
-	srv := servePage(t, `<a href="https://jobs.lever.co/valtech/1">`)
+	srv := servePage(t, `<a href="https://acme.taleo.net/careersection/2/jobsearch.ftl">`)
 
 	// Host is 127.0.0.1 so no board guess is possible here; the point is
 	// that a recognised vendor is reported, and usable is false.
 	got := Detect(context.Background(), srv.URL)
-	if got.Platform != "lever" || got.Usable() {
-		t.Errorf("Detect() = %+v, want unusable lever", got)
+	if got.Platform != "taleo" || got.Usable() {
+		t.Errorf("Detect() = %+v, want unusable taleo", got)
 	}
 }
 
 func TestFetchJobs_UnsupportedVendor(t *testing.T) {
-	srv := servePage(t, `<a href="https://jobs.lever.co/acme/1">`)
+	srv := servePage(t, `<a href="https://acme.taleo.net/careersection/2/jobsearch.ftl">`)
 
 	_, err := FetchJobs(context.Background(), srv.URL, "", "", 1)
 
 	var unsupported *UnsupportedPlatformError
-	if !errors.As(err, &unsupported) || unsupported.Platform != "lever" {
-		t.Fatalf("error = %v, want UnsupportedPlatformError for lever", err)
+	if !errors.As(err, &unsupported) || unsupported.Platform != "taleo" {
+		t.Fatalf("error = %v, want UnsupportedPlatformError for taleo", err)
 	}
 	if !errors.Is(err, ErrUnsupportedPlatform) {
 		t.Error("UnsupportedPlatformError should also match ErrUnsupportedPlatform")

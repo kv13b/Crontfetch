@@ -20,6 +20,8 @@ import (
 // will read from a career site.
 const maxPagesPerFetch = 100
 
+const supportedPlatforms = "TalentBrew, Greenhouse, Workday, Lever, Ashby, SmartRecruiters, Workable, Recruitee, BeeSite"
+
 // postgresInvalidTextRepresentation is returned when a value can't be
 // parsed as the column's type, e.g. a malformed UUID in a URL.
 const postgresInvalidTextRepresentation = "22P02"
@@ -60,20 +62,20 @@ func CompanyJobs(pool *pgxpool.Pool) http.HandlerFunc {
 			switch {
 			case errors.As(err, &unsupported):
 				slog.Warn("company jobs: unsupported platform", "platform", unsupported.Platform, "career_url", company.CareerURL)
-				writeError(w, http.StatusUnprocessableEntity, "this career site uses "+unsupported.Platform+", which isn't supported yet — only TalentBrew, Greenhouse and Workday can be read right now")
+				writeError(w, http.StatusUnprocessableEntity, "this career site uses "+unsupported.Platform+", which isn't supported yet — supported: "+supportedPlatforms)
 				return
 			case errors.Is(err, fetcher.ErrUnsupportedPlatform):
 				slog.Warn("company jobs: unrecognised platform", "career_url", company.CareerURL)
-				writeError(w, http.StatusUnprocessableEntity, "couldn't recognise this career site's platform — only TalentBrew, Greenhouse and Workday can be read right now")
+				writeError(w, http.StatusUnprocessableEntity, "couldn't recognise this career site's platform — supported: "+supportedPlatforms)
 				return
 			case errors.Is(err, fetcher.ErrWorkdaySiteNotFound):
 				writeError(w, http.StatusUnprocessableEntity, "no workday career site found at the saved career_url")
 				return
 			case errors.Is(err, fetcher.ErrMissingBoard):
-				writeError(w, http.StatusUnprocessableEntity, "this site uses Greenhouse, but its board name couldn't be worked out — save the company with platform \"greenhouse\" and its board name")
+				writeError(w, http.StatusUnprocessableEntity, "this site's job board name couldn't be worked out — save the company with its platform and board name")
 				return
 			case errors.Is(err, fetcher.ErrBoardNotFound):
-				writeError(w, http.StatusUnprocessableEntity, "no greenhouse job board found with the saved board name")
+				writeError(w, http.StatusUnprocessableEntity, "no job board found with the saved board name")
 				return
 			}
 			slog.Error("company jobs: fetching", "error", err, "company_id", company.ID, "career_url", company.CareerURL)
