@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kv13b/Crontfetch/internal/fetcher"
@@ -46,8 +44,7 @@ func CompanyJobs(pool *pgxpool.Pool) http.HandlerFunc {
 
 		company, err := getCompanyByID(r.Context(), pool, claims.UserID, r.PathValue("id"))
 		if err != nil {
-			var pgErr *pgconn.PgError
-			if errors.Is(err, pgx.ErrNoRows) || (errors.As(err, &pgErr) && pgErr.Code == postgresInvalidTextRepresentation) {
+			if isCompanyNotFound(err) {
 				writeError(w, http.StatusNotFound, "company not found")
 				return
 			}
