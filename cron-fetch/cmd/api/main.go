@@ -6,10 +6,14 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kv13b/Crontfetch/internal/config"
 	"github.com/kv13b/Crontfetch/internal/db"
 	"github.com/kv13b/Crontfetch/internal/handlers"
+	"github.com/kv13b/Crontfetch/internal/jobsync"
 	"github.com/kv13b/Crontfetch/internal/middleware"
 )
 
@@ -32,6 +36,12 @@ func main() {
 	defer pool.Close()
 	slog.Info("connected to database")
 
+	if cfg.TelegramBotToken == "" || cfg.TelegramChatID == "" {
+		slog.Warn("jobsync: disabled, TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID not set")
+	} else {
+		go runJobSync(ctx, pool, cfg)
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", handlers.Health(pool))
 	mux.HandleFunc("POST /signup", handlers.Signup(pool, cfg.JWTSecret))
@@ -47,5 +57,19 @@ func main() {
 	if err := http.ListenAndServe(addr, middleware.Logging(mux)); err != nil {
 		slog.Error("server stopped", "error", err)
 		os.Exit(1)
+	}
+}
+
+// runJobSync checks tracked companies for new matching jobs on a timer,
+// starting immediately rather than waiting a full interval for the first run.
+func runJobSync(ctx context.Context, pool *pgxpool.Pool, cfg config.Config) {
+	slog.Info("jobsync: enabled", "interval", cfg.FetchInterval)
+
+	ticker := time.NewTicker(cfg.FetchInterval)
+	defer ticker.Stop()
+
+	for {
+		jobsync.SyncAll(ctx, pool, cfg.TelegramBotToken, cfg.TelegramChatID)
+		<-ticker.C
 	}
 }
