@@ -52,7 +52,11 @@ func main() {
 	mux.Handle("PATCH /companies/{id}", middleware.Auth(cfg.JWTSecret)(handlers.UpdateCompany(pool)))
 	mux.Handle("GET /companies/{id}/jobs", middleware.Auth(cfg.JWTSecret)(handlers.CompanyJobs(pool)))
 
-	addr := ":8080"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	addr := ":" + port
 	slog.Info("CronFetch listening", "addr", addr)
 	if err := http.ListenAndServe(addr, middleware.Logging(mux)); err != nil {
 		slog.Error("server stopped", "error", err)
