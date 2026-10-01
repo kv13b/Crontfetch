@@ -18,6 +18,7 @@ type greenhouseResponse struct {
 		ID          int64  `json:"id"`
 		Title       string `json:"title"`
 		AbsoluteURL string `json:"absolute_url"`
+		Content     string `json:"content"` // full description HTML; only present with ?content=true
 		Location    struct {
 			Name string `json:"name"`
 		} `json:"location"`
@@ -35,7 +36,7 @@ func FetchGreenhouseJobs(ctx context.Context, board string) ([]Job, error) {
 		return nil, ErrMissingBoard
 	}
 
-	resp, err := get(ctx, greenhouseAPIBase+"/"+url.PathEscape(board)+"/jobs", false)
+	resp, err := get(ctx, greenhouseAPIBase+"/"+url.PathEscape(board)+"/jobs?content=true", false)
 	if err != nil {
 		return nil, fmt.Errorf("fetching greenhouse board: %w", err)
 	}
@@ -69,7 +70,7 @@ func FetchGreenhouseJobs(ctx context.Context, board string) ([]Job, error) {
 			Title:    strings.TrimSpace(j.Title),
 			Location: joinUnique(names),
 			URL:      j.AbsoluteURL,
-		})
+		}.withExperience(j.Content))
 	}
 	return jobs, nil
 }

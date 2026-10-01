@@ -22,6 +22,15 @@ type Job struct {
 	Title    string `json:"title"`
 	Location string `json:"location"`
 	URL      string `json:"url"`
+	// Experience is a human-readable stated range (e.g. "3-5 years"),
+	// set only when the listing included enough text to find one — see
+	// SupportsExperienceFilter and parseExperience.
+	Experience string `json:"experience,omitempty"`
+
+	// expMin/expMax back Experience for filtering (FilterJobs); unexported
+	// since callers outside this package only need the display string.
+	expMin *int
+	expMax *int
 }
 
 // ErrUnsupportedPlatform means the career page isn't built on a platform

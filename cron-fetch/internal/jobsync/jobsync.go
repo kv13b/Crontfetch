@@ -52,7 +52,7 @@ func syncCompany(ctx context.Context, pool *pgxpool.Pool, botToken, chatID strin
 	if err != nil {
 		return fmt.Errorf("fetching jobs: %w", err)
 	}
-	matched := fetcher.FilterJobs(jobs, c.Roles, c.Locations)
+	matched := fetcher.FilterJobs(jobs, c.Roles, c.Locations, c.MinExperienceYears, c.MaxExperienceYears)
 
 	// A company with no rows yet is being synced for the first time: record
 	// its current matches as a baseline instead of notifying about all of

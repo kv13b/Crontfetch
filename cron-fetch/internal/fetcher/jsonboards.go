@@ -56,10 +56,11 @@ func getBoardJSON(ctx context.Context, platform, board, apiURL string, v any) er
 // FetchLeverJobs reads every posting on a company's Lever board.
 func FetchLeverJobs(ctx context.Context, board string) ([]Job, error) {
 	var postings []struct {
-		ID         string `json:"id"`
-		Text       string `json:"text"`
-		HostedURL  string `json:"hostedUrl"`
-		Categories struct {
+		ID               string `json:"id"`
+		Text             string `json:"text"`
+		HostedURL        string `json:"hostedUrl"`
+		DescriptionPlain string `json:"descriptionPlain"`
+		Categories       struct {
 			Location     string   `json:"location"`
 			AllLocations []string `json:"allLocations"`
 		} `json:"categories"`
@@ -79,7 +80,7 @@ func FetchLeverJobs(ctx context.Context, board string) ([]Job, error) {
 			Title:    strings.TrimSpace(p.Text),
 			Location: joinUnique(locations),
 			URL:      p.HostedURL,
-		})
+		}.withExperience(p.DescriptionPlain))
 	}
 	return jobs, nil
 }
@@ -91,6 +92,7 @@ func FetchAshbyJobs(ctx context.Context, board string) ([]Job, error) {
 			ID                 string `json:"id"`
 			Title              string `json:"title"`
 			Location           string `json:"location"`
+			DescriptionPlain   string `json:"descriptionPlain"`
 			SecondaryLocations []struct {
 				Location string `json:"location"`
 			} `json:"secondaryLocations"`
@@ -120,7 +122,7 @@ func FetchAshbyJobs(ctx context.Context, board string) ([]Job, error) {
 			Title:    strings.TrimSpace(j.Title),
 			Location: joinUnique(locations),
 			URL:      j.JobURL,
-		})
+		}.withExperience(j.DescriptionPlain))
 	}
 	return jobs, nil
 }
@@ -214,6 +216,7 @@ func FetchWorkableJobs(ctx context.Context, board string) ([]Job, error) {
 			Title         string `json:"title"`
 			Shortcode     string `json:"shortcode"`
 			URL           string `json:"url"`
+			Description   string `json:"description"`
 			Telecommuting bool   `json:"telecommuting"`
 			City          string `json:"city"`
 			State         string `json:"state"`
@@ -225,7 +228,7 @@ func FetchWorkableJobs(ctx context.Context, board string) ([]Job, error) {
 			} `json:"locations"`
 		} `json:"jobs"`
 	}
-	if err := getBoardJSON(ctx, "workable", board, workableAPIBase+"/"+url.PathEscape(board), &payload); err != nil {
+	if err := getBoardJSON(ctx, "workable", board, workableAPIBase+"/"+url.PathEscape(board)+"?details=true", &payload); err != nil {
 		return nil, err
 	}
 
@@ -246,7 +249,7 @@ func FetchWorkableJobs(ctx context.Context, board string) ([]Job, error) {
 			Title:    strings.TrimSpace(j.Title),
 			Location: joinUnique(locations),
 			URL:      j.URL,
-		})
+		}.withExperience(j.Description))
 	}
 	return jobs, nil
 }
@@ -256,14 +259,17 @@ func FetchWorkableJobs(ctx context.Context, board string) ([]Job, error) {
 func FetchRecruiteeJobs(ctx context.Context, board string) ([]Job, error) {
 	var payload struct {
 		Offers []struct {
-			ID         int64  `json:"id"`
-			Title      string `json:"title"`
-			Location   string `json:"location"`
-			City       string `json:"city"`
-			Country    string `json:"country"`
-			Remote     bool   `json:"remote"`
-			Status     string `json:"status"`
-			CareersURL string `json:"careers_url"`
+			ID           int64  `json:"id"`
+			Title        string `json:"title"`
+			Location     string `json:"location"`
+			City         string `json:"city"`
+			Country      string `json:"country"`
+			Remote       bool   `json:"remote"`
+			Status       string `json:"status"`
+			CareersURL   string `json:"careers_url"`
+			Translations map[string]struct {
+				Description string `json:"description"`
+			} `json:"translations"`
 		} `json:"offers"`
 	}
 	if err := getBoardJSON(ctx, "recruitee", board, recruiteeAPIURL(url.PathEscape(board)), &payload); err != nil {
@@ -288,7 +294,7 @@ func FetchRecruiteeJobs(ctx context.Context, board string) ([]Job, error) {
 			Title:    strings.TrimSpace(o.Title),
 			Location: joinUnique(locations),
 			URL:      o.CareersURL,
-		})
+		}.withExperience(o.Translations["en"].Description))
 	}
 	return jobs, nil
 }

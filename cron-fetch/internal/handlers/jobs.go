@@ -80,7 +80,7 @@ func CompanyJobs(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		matched := fetcher.FilterJobs(jobs, company.Roles, company.Locations)
+		matched := fetcher.FilterJobs(jobs, company.Roles, company.Locations, company.MinExperienceYears, company.MaxExperienceYears)
 		slog.Info("company jobs: fetched", "company_id", company.ID, "scanned", len(jobs), "matched", len(matched))
 
 		resp := companyJobsResponse{
@@ -90,7 +90,11 @@ func CompanyJobs(pool *pgxpool.Pool) http.HandlerFunc {
 			Jobs:         matched,
 		}
 		if company.MinExperienceYears != nil || company.MaxExperienceYears != nil {
-			resp.Warnings = append(resp.Warnings, "experience filters are saved but not applied yet: job listings don't include required experience")
+			if fetcher.SupportsExperienceFilter(company.Platform) {
+				resp.Warnings = append(resp.Warnings, "experience filters are applied on a best-effort basis: a job whose listing doesn't clearly state a required range is included rather than excluded")
+			} else {
+				resp.Warnings = append(resp.Warnings, "experience filters are saved but not applied for this platform — its job listings don't include enough detail to check")
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")

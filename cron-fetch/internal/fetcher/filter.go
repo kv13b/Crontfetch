@@ -3,18 +3,47 @@ package fetcher
 import "strings"
 
 // FilterJobs keeps the jobs that match ANY of the roles AND ANY of the
-// locations. An empty list means "no constraint" for that dimension.
+// locations AND the experience range. An empty list, or a nil pair of
+// experience bounds, means "no constraint" for that dimension.
 //
 // Roles are matched as case-insensitive substrings of the job title.
 // Locations are matched against the job's location (see matchesLocation).
-func FilterJobs(jobs []Job, roles, locations []string) []Job {
+// Experience is matched against what parseExperience found in the job's
+// description, if the platform provided one — see matchesExperience.
+func FilterJobs(jobs []Job, roles, locations []string, minExperience, maxExperience *int) []Job {
 	matched := make([]Job, 0, len(jobs))
 	for _, j := range jobs {
-		if matchesAnyRole(j, roles) && matchesAnyLocation(j, locations) {
+		if matchesAnyRole(j, roles) && matchesAnyLocation(j, locations) && matchesExperience(j, minExperience, maxExperience) {
 			matched = append(matched, j)
 		}
 	}
 	return matched
+}
+
+// matchesExperience reports whether a job's stated experience range (if any)
+// overlaps the caller's desired [min, max] range. Either side of either
+// range may be unbounded (nil). A job with no stated range always matches:
+// excluding it on missing information could hide a genuinely relevant
+// posting that simply didn't phrase its requirement in a recognized way.
+func matchesExperience(j Job, min, max *int) bool {
+	if min == nil && max == nil {
+		return true
+	}
+	if j.expMin == nil && j.expMax == nil {
+		return true
+	}
+
+	jobMin := 0
+	if j.expMin != nil {
+		jobMin = *j.expMin
+	}
+	if max != nil && jobMin > *max {
+		return false
+	}
+	if min != nil && j.expMax != nil && *j.expMax < *min {
+		return false
+	}
+	return true
 }
 
 func matchesAnyRole(j Job, roles []string) bool {

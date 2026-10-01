@@ -13,7 +13,7 @@ import (
 // syncing is a background job rather than a per-user request.
 func listAllCompanies(ctx context.Context, pool *pgxpool.Pool) ([]models.Company, error) {
 	const query = `
-		SELECT id, name, career_url, platform, board, roles, locations
+		SELECT id, name, career_url, platform, board, min_experience_years, max_experience_years, roles, locations
 		FROM companies
 	`
 
@@ -25,8 +25,8 @@ func listAllCompanies(ctx context.Context, pool *pgxpool.Pool) ([]models.Company
 
 	companies := make([]models.Company, 0)
 	for rows.Next() {
-		var c models.Company
-		if err := rows.Scan(&c.ID, &c.Name, &c.CareerURL, &c.Platform, &c.Board, &c.Roles, &c.Locations); err != nil {
+		c, err := scanSyncCompany(rows)
+		if err != nil {
 			return nil, err
 		}
 		companies = append(companies, c)
@@ -38,13 +38,23 @@ func listAllCompanies(ctx context.Context, pool *pgxpool.Pool) ([]models.Company
 // a background job, not a per-user request.
 func getCompanyByID(ctx context.Context, pool *pgxpool.Pool, id string) (models.Company, error) {
 	const query = `
-		SELECT id, name, career_url, platform, board, roles, locations
+		SELECT id, name, career_url, platform, board, min_experience_years, max_experience_years, roles, locations
 		FROM companies
 		WHERE id = $1
 	`
 
+	return scanSyncCompany(pool.QueryRow(ctx, query, id))
+}
+
+// rowScanner is satisfied by both pgx.Row and pgx.Rows.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanSyncCompany(row rowScanner) (models.Company, error) {
 	var c models.Company
-	err := pool.QueryRow(ctx, query, id).Scan(&c.ID, &c.Name, &c.CareerURL, &c.Platform, &c.Board, &c.Roles, &c.Locations)
+	err := row.Scan(&c.ID, &c.Name, &c.CareerURL, &c.Platform, &c.Board,
+		&c.MinExperienceYears, &c.MaxExperienceYears, &c.Roles, &c.Locations)
 	return c, err
 }
 
