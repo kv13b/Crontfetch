@@ -2,8 +2,10 @@
 
 Tracks companies' career pages, filters their job listings by role/location,
 and sends a Telegram message when a genuinely new matching job appears. See
-[docs/functional-requirements.md](docs/functional-requirements.md) for the
-full API reference and [docs/non-functional-requirements.md](docs/non-functional-requirements.md)
+[docs/functional-requirements.md](docs/functional-requirements.md) for how
+the service works, [docs/api-reference.md](docs/api-reference.md) for exact
+request/response examples (e.g. for building a frontend), and
+[docs/non-functional-requirements.md](docs/non-functional-requirements.md)
 for an overview of what it does and its current limitations.
 
 ## Prerequisites
