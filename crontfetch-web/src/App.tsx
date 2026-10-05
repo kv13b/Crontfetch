@@ -1,19 +1,24 @@
-import AuthPage from './pages/AuthPage'
-import { logout } from './store/auth'
-import { useAppDispatch, useAppSelector } from './store/hooks'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import Layout from './components/Layout'
+import ProtectedRoute from './components/ProtectedRoute'
+import DashboardPage from './pages/DashboardPage'
+import LandingPage from './pages/LandingPage'
+import LoginPage from './pages/LoginPage'
+import SignupPage from './pages/SignupPage'
 
 function App() {
-  const dispatch = useAppDispatch()
-  const { token, user } = useAppSelector((s) => s.auth)
-
-  if (!token) return <AuthPage />
-
   return (
-    <main>
-      <h1>Job Fetcher</h1>
-      <p>Signed in{user ? ` as ${user.name}` : ''}</p>
-      <button onClick={() => dispatch(logout())}>Log out</button>
-    </main>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route index element={<LandingPage />} />
+        <Route path="login" element={<LoginPage />} />
+        <Route path="signup" element={<SignupPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="dashboard" element={<DashboardPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
   )
 }
 

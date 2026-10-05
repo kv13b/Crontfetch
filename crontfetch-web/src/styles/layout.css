@@ -1,0 +1,216 @@
+/* App shell */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app__main {
+  flex: 1;
+}
+
+/* Navbar */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: var(--nav-height);
+  background: color-mix(in srgb, var(--color-bg) 80%, transparent);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.navbar__inner {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: var(--space-8);
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+}
+
+.logo__mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--gradient-brand);
+  color: #fff;
+  font-size: var(--fs-sm);
+}
+
+.navbar__menu {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.navbar__links {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.navbar__link {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-full);
+  transition: color var(--transition), background var(--transition);
+}
+
+.navbar__link:hover,
+.navbar__link.active {
+  color: var(--color-text);
+  background: var(--color-bg-subtle);
+}
+
+.navbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.navbar__user {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  margin-right: var(--space-2);
+}
+
+/* Hamburger button, shown on small screens only */
+.navbar__toggle {
+  display: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.navbar__toggle-bar,
+.navbar__toggle-bar::before,
+.navbar__toggle-bar::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 2px;
+  transition: transform var(--transition), background var(--transition);
+}
+
+.navbar__toggle-bar {
+  position: relative;
+}
+
+.navbar__toggle-bar::before,
+.navbar__toggle-bar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+
+.navbar__toggle-bar::before {
+  top: -6px;
+}
+
+.navbar__toggle-bar::after {
+  top: 6px;
+}
+
+.navbar--open .navbar__toggle-bar {
+  background: transparent;
+}
+
+.navbar--open .navbar__toggle-bar::before {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.navbar--open .navbar__toggle-bar::after {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+@media (max-width: 860px) {
+  .navbar__toggle {
+    display: grid;
+  }
+
+  .navbar__menu {
+    display: none;
+    position: absolute;
+    top: var(--nav-height);
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    box-shadow: var(--shadow-md);
+  }
+
+  .navbar--open .navbar__menu {
+    display: flex;
+  }
+
+  .navbar__links {
+    flex-direction: column;
+  }
+
+  .navbar__link {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+  }
+
+  .navbar__actions {
+    flex-direction: column;
+    align-items: stretch;
+    margin-left: 0;
+  }
+
+  .navbar__user {
+    margin: 0 0 var(--space-2);
+  }
+}
+
+/* Footer */
+.footer {
+  padding-block: var(--space-12);
+  border-top: 1px solid var(--color-border);
+}
+
+.footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.footer__links {
+  display: flex;
+  gap: var(--space-6);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.footer__links a:hover {
+  color: var(--color-text);
+}
+
+.footer__copy {
+  font-size: var(--fs-sm);
+  color: var(--color-text-subtle);
+}

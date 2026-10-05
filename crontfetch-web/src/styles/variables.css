@@ -1,0 +1,97 @@
+/* Design tokens: every color, size and spacing value in the app comes from here. */
+:root {
+  /* Colors */
+  --color-bg: #ffffff;
+  --color-bg-subtle: #f7f7fb;
+  --color-surface: #ffffff;
+  --color-border: #e7e7f0;
+  --color-border-strong: #d4d4e2;
+  --color-text: #12121c;
+  --color-text-muted: #5d5d73;
+  --color-text-subtle: #8a8aa0;
+
+  --color-primary: #5b4cf0;
+  --color-primary-hover: #4a3bdf;
+  --color-primary-soft: #efedff;
+  --color-on-primary: #ffffff;
+
+  --color-success: #15a34a;
+  --color-success-soft: #e7f8ee;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fdecec;
+
+  --gradient-brand: linear-gradient(135deg, #5b4cf0 0%, #a855f7 55%, #ec4899 100%);
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-base: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 1.5rem;
+  --fs-3xl: clamp(1.75rem, 3.5vw, 2.25rem);
+  --fs-display: clamp(2.25rem, 6vw, 3.75rem);
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --lh-tight: 1.15;
+  --lh-base: 1.6;
+
+  /* Spacing (4px scale) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+
+  /* Shape and depth */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 999px;
+  --shadow-sm: 0 1px 2px rgb(18 18 28 / 0.06);
+  --shadow-md: 0 4px 16px rgb(18 18 28 / 0.08);
+  --shadow-lg: 0 20px 48px rgb(18 18 28 / 0.12);
+  --ring: 0 0 0 3px rgb(91 76 240 / 0.25);
+
+  /* Layout */
+  --container-width: 1160px;
+  --nav-height: 68px;
+  --transition: 160ms ease;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0c0c14;
+    --color-bg-subtle: #12121d;
+    --color-surface: #171724;
+    --color-border: #262638;
+    --color-border-strong: #34344a;
+    --color-text: #f1f1f7;
+    --color-text-muted: #a5a5bd;
+    --color-text-subtle: #75758f;
+
+    --color-primary: #7b6dff;
+    --color-primary-hover: #8f83ff;
+    --color-primary-soft: #221f45;
+
+    --color-success: #34d399;
+    --color-success-soft: #10291f;
+    --color-danger: #f87171;
+    --color-danger-soft: #2c1414;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 16px rgb(0 0 0 / 0.45);
+    --shadow-lg: 0 20px 48px rgb(0 0 0 / 0.55);
+    --ring: 0 0 0 3px rgb(123 109 255 / 0.35);
+  }
+}
