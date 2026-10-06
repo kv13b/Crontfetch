@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -20,6 +21,8 @@ type Config struct {
 	TelegramChatID   string
 	JWTSecret        string
 	FetchInterval    time.Duration
+	// CORSAllowedOrigins lists the browser origins allowed to call the API.
+	CORSAllowedOrigins []string
 }
 
 // Load reads .env (if present) into the process environment, then builds a Config.
@@ -49,6 +52,12 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("FETCH_INTERVAL_HOURS must be a positive number, got %q", raw)
 		}
 		cfg.FetchInterval = time.Duration(hours * float64(time.Hour))
+	}
+
+	for _, o := range strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			cfg.CORSAllowedOrigins = append(cfg.CORSAllowedOrigins, o)
+		}
 	}
 
 	return cfg, nil

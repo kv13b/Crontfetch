@@ -58,7 +58,8 @@ func main() {
 	}
 	addr := ":" + port
 	slog.Info("CronFetch listening", "addr", addr)
-	if err := http.ListenAndServe(addr, middleware.Logging(mux)); err != nil {
+	handler := middleware.Logging(middleware.CORS(cfg.CORSAllowedOrigins)(mux))
+	if err := http.ListenAndServe(addr, handler); err != nil {
 		slog.Error("server stopped", "error", err)
 		os.Exit(1)
 	}
