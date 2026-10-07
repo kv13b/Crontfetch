@@ -227,185 +227,36 @@
   }
 }
 
-/* Filter bar (Search jobs, Jobs around me) */
-.filter-bar {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-6);
-}
-
-.filter-bar__item {
+/* Input with a trailing action button (e.g. show/hide password) */
+.input-group {
   position: relative;
 }
 
-.filter-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+.input-group .input {
+  width: 100%;
+}
+
+.input--with-action {
+  padding-right: calc(var(--space-4) + 36px);
+}
+
+.input-group__action {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: 36px;
   height: 36px;
-  padding-inline: var(--space-4);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--color-text-muted);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-full);
-  transition: border-color var(--transition), background var(--transition),
-    color var(--transition);
+  transform: translateY(-50%);
+  color: var(--color-text-subtle);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition), background var(--transition);
 }
 
-.filter-pill:hover,
-.filter-pill[aria-expanded="true"] {
+.input-group__action:hover {
   color: var(--color-text);
-  border-color: var(--color-text-subtle);
-}
-
-.filter-pill--active {
-  color: var(--color-primary);
-  background: var(--color-primary-soft);
-  border-color: var(--color-primary);
-}
-
-.filter-pill__label {
-  max-width: 220px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.filter-pill__chevron {
-  width: 6px;
-  height: 6px;
-  margin-bottom: 3px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(45deg);
-}
-
-.filter-pill[aria-expanded="true"] .filter-pill__chevron {
-  margin-bottom: -3px;
-  transform: rotate(225deg);
-}
-
-.filter-popover {
-  position: absolute;
-  top: calc(100% + var(--space-2));
-  left: 0;
-  z-index: 15;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  width: 320px;
-  padding: var(--space-4);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-}
-
-.filter-popover__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-
-@media (max-width: 640px) {
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-  .filter-bar__item {
-    position: static;
-  }
-
-  .filter-popover {
-    right: 0;
-    width: auto;
-  }
-}
-
-/* Go online / Go offline card */
-.online-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-}
-
-.online-card--on {
-  border-color: var(--color-success);
-}
-
-.online-card__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.online-card__title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-}
-
-.online-card__text {
-  margin-top: 2px;
-  font-size: var(--fs-xs);
-}
-
-.online-card__dot {
-  width: 8px;
-  height: 8px;
-  background: var(--color-text-subtle);
-  border-radius: var(--radius-full);
-}
-
-.online-card--on .online-card__dot {
-  background: var(--color-success);
-  box-shadow: 0 0 0 3px var(--color-success-soft);
-}
-
-/* On/off switch */
-.switch {
-  position: relative;
-  flex-shrink: 0;
-  width: 40px;
-  height: 24px;
-  background: var(--color-border-strong);
-  border-radius: var(--radius-full);
-  transition: background var(--transition);
-}
-
-.switch--on {
-  background: var(--color-success);
-}
-
-.switch:focus-visible {
-  outline: none;
-  box-shadow: var(--ring);
-}
-
-.switch__thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 18px;
-  height: 18px;
-  background: #fff;
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--transition);
-}
-
-.switch--on .switch__thumb {
-  transform: translateX(16px);
+  background: var(--color-bg-subtle);
 }

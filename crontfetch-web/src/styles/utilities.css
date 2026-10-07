@@ -55,3 +55,9 @@
     padding-block: var(--space-16);
   }
 }
+
+/* Never allow sideways scrolling on any screen size */
+html,
+body {
+  overflow-x: clip;
+}
