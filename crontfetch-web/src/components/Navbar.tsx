@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import type { MouseEvent } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { logout } from '../store/auth'
-import { useAppDispatch, useAppSelector } from '../store/hooks'
+import { Link, NavLink } from 'react-router-dom'
+import { useAppSelector } from '../store/hooks'
 import Logo from './Logo'
+import ProfileMenu from './ProfileMenu'
 
 const sectionLinks = [
   { label: 'Features', hash: '#features' },
@@ -11,20 +11,22 @@ const sectionLinks = [
   { label: 'Platforms', hash: '#platforms' },
 ]
 
+// Menu shown once logged in.
+const appLinks = [
+  { label: 'Dashboard', to: '/dashboard' },
+  { label: 'Search jobs', to: '/search' },
+  { label: 'Jobs around me', to: '/nearby' },
+  { label: 'Notifications', to: '/notifications' },
+]
+
 function Navbar() {
-  const dispatch = useAppDispatch()
-  const navigate = useNavigate()
-  const { token, user } = useAppSelector((s) => s.auth)
+  const token = useAppSelector((s) => s.auth.token)
   const [open, setOpen] = useState(false)
 
-  // Close the mobile menu whenever a link or button inside it is clicked.
+  // Close the mobile menu whenever a link or button inside it is clicked,
+  // except the profile button, which only opens its own dropdown.
   const closeOnNavigate = (e: MouseEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('a, button')) setOpen(false)
-  }
-
-  const handleLogout = () => {
-    dispatch(logout())
-    navigate('/')
+    if ((e.target as HTMLElement).closest('a, button:not([aria-haspopup])')) setOpen(false)
   }
 
   return (
@@ -44,30 +46,26 @@ function Navbar() {
 
         <div className="navbar__menu" onClick={closeOnNavigate}>
           <ul className="navbar__links">
-            {sectionLinks.map((link) => (
-              <li key={link.hash}>
-                <Link className="navbar__link" to={{ pathname: '/', hash: link.hash }}>
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-            {token && (
-              <li>
-                <NavLink className="navbar__link" to="/dashboard">
-                  Dashboard
-                </NavLink>
-              </li>
-            )}
+            {token
+              ? appLinks.map((link) => (
+                  <li key={link.to}>
+                    <NavLink className="navbar__link" to={link.to}>
+                      {link.label}
+                    </NavLink>
+                  </li>
+                ))
+              : sectionLinks.map((link) => (
+                  <li key={link.hash}>
+                    <Link className="navbar__link" to={{ pathname: '/', hash: link.hash }}>
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
           </ul>
 
           <div className="navbar__actions">
             {token ? (
-              <>
-                {user && <span className="navbar__user">Hi, {user.name}</span>}
-                <button type="button" className="btn btn--secondary" onClick={handleLogout}>
-                  Log out
-                </button>
-              </>
+              <ProfileMenu />
             ) : (
               <>
                 <Link className="btn btn--ghost" to="/login">

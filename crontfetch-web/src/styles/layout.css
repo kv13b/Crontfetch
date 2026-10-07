@@ -81,10 +81,117 @@
   margin-left: auto;
 }
 
-.navbar__user {
+/* Profile dropdown (top right once logged in) */
+.profile-menu {
+  position: relative;
+}
+
+.profile-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: 0 var(--space-3) 0 var(--space-1);
   font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-  margin-right: var(--space-2);
+  font-weight: var(--fw-medium);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  transition: border-color var(--transition);
+}
+
+.profile-menu__trigger:hover,
+.profile-menu__trigger[aria-expanded="true"] {
+  border-color: var(--color-text-subtle);
+}
+
+.profile-menu__avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-full);
+}
+
+.profile-menu__name {
+  max-width: 120px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.profile-menu__chevron {
+  width: 7px;
+  height: 7px;
+  margin-bottom: 3px;
+  border-right: 2px solid var(--color-text-subtle);
+  border-bottom: 2px solid var(--color-text-subtle);
+  transform: rotate(45deg);
+  transition: transform var(--transition);
+}
+
+.profile-menu__trigger[aria-expanded="true"] .profile-menu__chevron {
+  margin-bottom: -3px;
+  transform: rotate(225deg);
+}
+
+.profile-menu__panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 20;
+  min-width: 220px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.profile-menu__header {
+  padding: var(--space-3);
+  margin-bottom: var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.profile-menu__header-name {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.profile-menu__header-email {
+  font-size: var(--fs-xs);
+  color: var(--color-text-subtle);
+  overflow-wrap: anywhere;
+}
+
+.profile-menu__item {
+  display: block;
+  width: 100%;
+  padding: var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  text-align: left;
+  color: var(--color-text);
+  background: transparent;
+  border-radius: var(--radius-md);
+  transition: background var(--transition);
+}
+
+.profile-menu__item:hover {
+  background: var(--color-bg-subtle);
+}
+
+.profile-menu__item--danger {
+  color: var(--color-danger);
+}
+
+.profile-menu__item--danger:hover {
+  background: var(--color-danger-soft);
 }
 
 /* Hamburger button, shown on small screens only */
@@ -180,8 +287,22 @@
     margin-left: 0;
   }
 
-  .navbar__user {
-    margin: 0 0 var(--space-2);
+  /* In the stacked mobile menu the dropdown opens inline, not as a floating panel */
+  .profile-menu__trigger {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .profile-menu__name {
+    flex: 1;
+    max-width: none;
+    text-align: left;
+  }
+
+  .profile-menu__panel {
+    position: static;
+    margin-top: var(--space-2);
+    box-shadow: none;
   }
 }
 
