@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
+import PasswordInput from '../components/PasswordInput'
 import { clearError, loginUser } from '../store/auth'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 
@@ -53,10 +54,8 @@ function LoginPage() {
             <label className="form-label" htmlFor="password">
               Password
             </label>
-            <input
+            <PasswordInput
               id="password"
-              className="input"
-              type="password"
               autoComplete="current-password"
               placeholder="••••••••"
               value={password}
