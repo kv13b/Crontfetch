@@ -21,7 +21,7 @@ After login the user gets:
 | **Search Jobs** | Manual keyword search across jobs from tracked companies, with filters. |
 | **Jobs around me** | Shows **all companies in our directory** within 10 km of the user's current location. Has the **Go Online / Offline** toggle on the same page. |
 | **Notifications** | Inbox of alerts. Missed alerts are kept for 5 days, then deleted. |
-| **Profile** | Personal details and the job filter (see §2). |
+| **Profile** | Account details and settings, opened from the profile dropdown (top right, with Log out). The job filter is **not** here; it is the filter bar on Search Jobs and Jobs around me (see §2). |
 | **Role-based views** | Chosen at login. See the roles section below. |
 
 ### Roles (decided)
@@ -55,14 +55,18 @@ Two location concepts. Keep them separate in code and in the database.
 - **Filter location**: where the user wants to work (e.g. `Bangalore`,
   `Remote`). Decides *which jobs are interesting*.
 
-### User filter (profile)
+### User filter (filter bar)
+
+A LinkedIn-style row of pills (Location, Role, Area of interest, Experience)
+at the top of **Search Jobs** and **Jobs around me**. Both pages share the
+same saved filter.
 
 | Field | Type | Example |
 |---|---|---|
 | `locations` | list of text | `["Bangalore", "Remote"]` |
 | `roles` | list of free text | `["react developer", "full stack developer", "PMO"]` |
 | `interests` | list of free text | `["react", "data engineering"]` |
-| `min_experience_years` / `max_experience_years` | int, optional | `2` / `6` |
+| `experience_years` | number, optional | `3` (the user's own years; matched against a job's stated range) |
 
 Rules:
 1. At least one field must be set. Otherwise the filter matches nothing.
@@ -192,7 +196,7 @@ already does. No migration tool yet.
 users                 + role TEXT NOT NULL DEFAULT 'user'           -- for later role-based views
 
 profiles              user_id PK→users, locations TEXT[], roles TEXT[],
-                      interests TEXT[], min_exp INT, max_exp INT, updated_at
+                      interests TEXT[], experience_years NUMERIC, updated_at
 
 directory_companies   id PK, name, career_url UNIQUE, platform, board,
                       office_address TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION,
@@ -370,8 +374,10 @@ run and check.
 - [ ] Routes and nav for Dashboard, Search Jobs, Jobs around me,
       Notifications, Profile.
 - [ ] Dashboard: replace the empty-state placeholder with a company card list.
-- [ ] Profile: the filter form (location, roles, interests, experience).
-- [ ] Search Jobs: keyword and filter UI on mock results.
+- [x] Filter bar (location, roles, interests, experience) as a shared
+      component, used on Search Jobs and Jobs around me. Saved in the browser
+      until `GET/PUT /profile` is connected.
+- [ ] Search Jobs: keyword search and results on mock data.
 - [ ] Jobs around me: map placeholder, company list, and the Go Online toggle
       (UI only).
 - [ ] Notifications: list with read state, showing a 5-day label.
