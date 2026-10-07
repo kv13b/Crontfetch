@@ -4,6 +4,10 @@ import ProtectedRoute from './components/ProtectedRoute'
 import DashboardPage from './pages/DashboardPage'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
+import NearbyPage from './pages/NearbyPage'
+import NotificationsPage from './pages/NotificationsPage'
+import ProfilePage from './pages/ProfilePage'
+import SearchJobsPage from './pages/SearchJobsPage'
 import SignupPage from './pages/SignupPage'
 
 function App() {
@@ -15,6 +19,10 @@ function App() {
         <Route path="signup" element={<SignupPage />} />
         <Route element={<ProtectedRoute />}>
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="search" element={<SearchJobsPage />} />
+          <Route path="nearby" element={<NearbyPage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
