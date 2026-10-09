@@ -16,6 +16,7 @@ const appLinks = [
   { label: 'Dashboard', to: '/dashboard' },
   { label: 'Search jobs', to: '/search' },
   { label: 'Jobs around me', to: '/nearby' },
+  { label: 'Add Jobs', to: '/add-jobs' },
   { label: 'Notifications', to: '/notifications' },
 ]
 
