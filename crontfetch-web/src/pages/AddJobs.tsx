@@ -24,7 +24,7 @@ export default function AddJobs({ isOpen = true, onClose = () => {} }) {
     setMaxExp('');
     setRoles('');
     setLocations('');
-    
+
     // Trigger parent close / navigation handler
     onClose();
   };
@@ -55,96 +55,95 @@ export default function AddJobs({ isOpen = true, onClose = () => {} }) {
   };
 
   return (
-    <div className="ac-form-container">
-      <h2 className="ac-modal-title">Track New Career Page</h2>
-
-      {error && (
-        <div className="ac-error-banner">
-          An error occurred
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="ac-form">
-        <div className="ac-form-group">
-          <label className="ac-form-label">Company Name *</label>
-          <input
-            type="text"
-            required
-            className="ac-form-input"
-            placeholder="e.g. Mercedes-Benz"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+    <section className="dashboard">
+      <div className="container">
+        <div className="dashboard__header">
+          <h1>Track New Career Page</h1>
+          <p>Add a new career page to track job postings.</p>
         </div>
 
-        <div className="ac-form-group">
-          <label className="ac-form-label">Career URL *</label>
-          <input
-            type="url"
-            required
-            className="ac-form-input"
-            placeholder="https://jobs.mercedes-benz.com/"
-            value={careerUrl}
-            onChange={(e) => setCareerUrl(e.target.value)}
-          />
-        </div>
-
-        <div className="ac-form-row">
+        <form onSubmit={handleSubmit} className="ac-form">
           <div className="ac-form-group">
-            <label className="ac-form-label">Min Exp (Years)</label>
+            <label className="ac-form-label">Company Name *</label>
             <input
-              type="number"
-              min="0"
+              type="text"
+              required
               className="ac-form-input"
-              placeholder="2"
-              value={minExp}
-              onChange={(e) => setMinExp(e.target.value)}
+              placeholder="e.g. Mercedes-Benz"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
             />
           </div>
+
           <div className="ac-form-group">
-            <label className="ac-form-label">Max Exp (Years)</label>
+            <label className="ac-form-label">Career URL *</label>
             <input
-              type="number"
-              min="0"
+              type="url"
+              required
               className="ac-form-input"
-              placeholder="6"
-              value={maxExp}
-              onChange={(e) => setMaxExp(e.target.value)}
+              placeholder="https://jobs.mercedes-benz.com/"
+              value={careerUrl}
+              onChange={(e) => setCareerUrl(e.target.value)}
             />
           </div>
-        </div>
 
-        <div className="ac-form-group">
-          <label className="ac-form-label">Roles (comma separated)</label>
-          <input
-            type="text"
-            className="ac-form-input"
-            placeholder="software engineer, developer"
-            value={roles}
-            onChange={(e) => setRoles(e.target.value)}
-          />
-        </div>
+          <div className="ac-form-row">
+            <div className="ac-form-group">
+              <label className="ac-form-label">Min Exp (Years)</label>
+              <input
+                type="number"
+                min="0"
+                className="ac-form-input"
+                placeholder="2"
+                value={minExp}
+                onChange={(e) => setMinExp(e.target.value)}
+              />
+            </div>
+            <div className="ac-form-group">
+              <label className="ac-form-label">Max Exp (Years)</label>
+              <input
+                type="number"
+                min="0"
+                className="ac-form-input"
+                placeholder="6"
+                value={maxExp}
+                onChange={(e) => setMaxExp(e.target.value)}
+              />
+            </div>
+          </div>
 
-        <div className="ac-form-group">
-          <label className="ac-form-label">Locations (comma separated)</label>
-          <input
-            type="text"
-            className="ac-form-input"
-            placeholder="India, Remote"
-            value={locations}
-            onChange={(e) => setLocations(e.target.value)}
-          />
-        </div>
+          <div className="ac-form-group">
+            <label className="ac-form-label">Roles (comma separated)</label>
+            <input
+              type="text"
+              className="ac-form-input"
+              placeholder="software engineer, developer"
+              value={roles}
+              onChange={(e) => setRoles(e.target.value)}
+            />
+          </div>
 
-        <div className="ac-button-group">
-          <button type="button" className="ac-btn-secondary" onClick={handleCancel}>
-            Cancel
-          </button>
-          <button type="submit" className="ac-btn-primary" disabled={isLoading}>
-            {isLoading ? 'Saving...' : 'Add Company'}
-          </button>
-        </div>
-      </form>
-    </div>
+          <div className="ac-form-group">
+            <label className="ac-form-label">Locations (comma separated)</label>
+            <input
+              type="text"
+              className="ac-form-input"
+              placeholder="India, Remote"
+              value={locations}
+              onChange={(e) => setLocations(e.target.value)}
+            />
+          </div>
+
+          <div className="ac-button-group">
+            <button type="button" className="ac-btn-secondary" onClick={handleCancel}>
+              Cancel
+            </button>
+            <button type="submit" className="ac-btn-primary" disabled={isLoading}>
+              {isLoading ? 'Saving...' : 'Add Company'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
   );
 }
