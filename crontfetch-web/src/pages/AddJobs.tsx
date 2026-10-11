@@ -1,5 +1,6 @@
-import { useState } from 'react';
-// import { useAddCompanyMutation } from '../services/api';
+import { useState, useEffect } from 'react';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { addCompany } from '../store/companies/companiesThunks';
 
 export default function AddJobs({ isOpen = true, onClose = () => {} }) {
   const [name, setName] = useState('');
@@ -8,13 +9,19 @@ export default function AddJobs({ isOpen = true, onClose = () => {} }) {
   const [maxExp, setMaxExp] = useState('');
   const [roles, setRoles] = useState('');
   const [locations, setLocations] = useState('');
+  const [toast, setToast] = useState<string | null>(null);
 
-  // --- Redux Mutation Hook Commented Out ---
-  // const [addCompany, { isLoading, error }] = useAddCompanyMutation();
-  const isLoading = false;
-  const error = null;
+  const dispatch = useAppDispatch();
+  const { loading, error } = useAppSelector((state) => state.companies);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const handleCancel = () => {
     // Reset form state
@@ -29,7 +36,7 @@ export default function AddJobs({ isOpen = true, onClose = () => {} }) {
     onClose();
   };
 
-  const handleSubmit = (e:any) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const payload = {
@@ -41,18 +48,21 @@ export default function AddJobs({ isOpen = true, onClose = () => {} }) {
       locations: locations ? locations.split(',').map((l) => l.trim()).filter(Boolean) : [],
     };
 
-    console.log('UI Form Submitted Payload:', payload);
-
-    // --- Redux API Call Commented Out ---
-    // try {
-    //   await addCompany(payload).unwrap();
-    //   onClose();
-    // } catch (err) {
-    //   console.error('Failed to add company:', err);
-    // }
-
-    onClose();
+    try {
+      await dispatch(addCompany(payload)).unwrap();
+      setToast('Company added successfully');
+    } finally {
+      // Reset form fields
+      setName('');
+      setCareerUrl('');
+      setMinExp('');
+      setMaxExp('');
+      setRoles('');
+      setLocations('');
+    }
   };
+
+  if (!isOpen) return null;
 
   return (
     <section className="dashboard">
@@ -61,6 +71,12 @@ export default function AddJobs({ isOpen = true, onClose = () => {} }) {
           <h1>Track New Career Page</h1>
           <p>Add a new career page to track job postings.</p>
         </div>
+
+        {toast && (
+          <div className="toast">
+            {toast}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="ac-form">
           <div className="ac-form-group">
@@ -138,11 +154,17 @@ export default function AddJobs({ isOpen = true, onClose = () => {} }) {
             <button type="button" className="ac-btn-secondary" onClick={handleCancel}>
               Cancel
             </button>
-            <button type="submit" className="ac-btn-primary" disabled={isLoading}>
-              {isLoading ? 'Saving...' : 'Add Company'}
+            <button type="submit" className="ac-btn-primary" disabled={loading}>
+              {loading ? 'Saving...' : 'Add Company'}
             </button>
           </div>
         </form>
+
+        {error && (
+          <div className="ac-error-banner">
+            {error}
+          </div>
+        )}
       </div>
     </section>
   );
