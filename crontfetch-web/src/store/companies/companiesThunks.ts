@@ -31,3 +31,22 @@ export const addCompany = createAsyncThunk(
     }
   }
 )
+
+export const fetchCompanies = createAsyncThunk(
+  'companies/fetchCompanies',
+  async (_, { rejectWithValue, getState }) => {
+    try {
+      const token = (getState() as RootState).auth.token
+      const response = await request('/companies', {
+        method: 'GET',
+        token,
+      })
+      return response
+    } catch (e: any) {
+      if (e instanceof Error) {
+        return rejectWithValue(e.message)
+      }
+      return rejectWithValue('Unknown error')
+    }
+  }
+)

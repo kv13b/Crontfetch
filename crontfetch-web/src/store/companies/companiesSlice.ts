@@ -1,14 +1,16 @@
 import { createSlice } from '@reduxjs/toolkit'
-import { addCompany } from './companiesThunks'
+import { addCompany, fetchCompanies } from './companiesThunks'
 
 export interface CompaniesState {
   loading: boolean
   error: string | null
+  companies: any[] // or define a proper type later
 }
 
 const initialState: CompaniesState = {
   loading: false,
   error: null,
+  companies: [],
 }
 
 const companiesSlice = createSlice({
@@ -26,6 +28,19 @@ const companiesSlice = createSlice({
         state.error = null
       })
       .addCase(addCompany.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+      })
+      .addCase(fetchCompanies.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(fetchCompanies.fulfilled, (state, action) => {
+        state.loading = false
+        state.error = null
+        state.companies = action.payload as any[]
+      })
+      .addCase(fetchCompanies.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload as string
       })
