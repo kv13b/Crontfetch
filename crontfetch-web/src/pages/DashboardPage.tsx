@@ -45,39 +45,49 @@ function DashboardPage() {
   return (
     <section className="dashboard">
       <div className="container">
-        <div className="dashboard__header">
-          <h1>Welcome{companies.length > 0 ? `, you have ${companies.length} company${companies.length > 1 ? 'ies' : ''} tracked` : ''} 👋</h1>
-          <p>{companies.length === 0 ? 'No companies tracked yet. Add a career page to start getting alerts for roles that match you.' : 'Here\'s where your tracked companies and new matches will show up.'}</p>
-        </div>
-
-        <div className="card">
-          {companies.length === 0 ? (
-            <>
-              <h2>No companies tracked yet</h2>
-              <p>Add a career page to start getting alerts for roles that match you.</p>
-              <button type="button" className="btn btn--primary" onClick={() => navigate('/add-jobs')}>
-                Add company
-              </button>
-            </>
-          ) : (
-            <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
-                <h2>Tracked Companies</h2>
-                <button type="button" className="btn btn--primary" onClick={() => navigate('/add-jobs')}>
-                  Add another company
-                </button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 'var(--space-4)' }}>
-                {companies.map((company) => (
-                  <div key={company.id} className="card">
-                    <h3>{company.name}</h3>
-                    <p className="company-url">{company.career_url}</p>
-                  </div>
-                ))}
-              </div>
-            </>
+        
+        {/* Header Section */}
+        <div className="dashboard__top-bar">
+          <div>
+            <h1>Welcome{companies.length > 0 ? `, you have ${companies.length} company tracked` : ''} 👋</h1>
+            <p>{companies.length === 0 ? 'No companies tracked yet. Add a career page to start getting alerts.' : 'Here is where your tracked companies and live job updates appear.'}</p>
+          </div>
+          {companies.length > 0 && (
+            <button type="button" className="btn btn--primary" onClick={() => navigate('/add-jobs')}>
+              + Add another company
+            </button>
           )}
         </div>
+
+        {/* Content Section */}
+        {companies.length === 0 ? (
+          <div className="card empty-state">
+            <h2>No companies tracked yet</h2>
+            <p>Add a career page to start getting alerts for roles that match you.</p>
+            <button type="button" className="btn btn--primary" onClick={() => navigate('/add-jobs')}>
+              Add company
+            </button>
+          </div>
+        ) : (
+          <div className="company-grid">
+            {companies.map((company) => (
+              <div key={company.id} className="card company-card">
+                <div className="company-info">
+                  <h3>{company.name}</h3>
+                  <a href={company.career_url} target="_blank" rel="noreferrer" className="company-url">
+                    {company.career_url}
+                  </a>
+                </div>
+                <div className="company-actions">
+                  <button type="button" className="btn btn--secondary btn--sm" onClick={() => navigate(`/companies/${company.id}/jobs`)}>
+                    View Jobs
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
       </div>
     </section>
   )
