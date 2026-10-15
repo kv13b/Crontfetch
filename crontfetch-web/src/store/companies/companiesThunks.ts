@@ -50,3 +50,38 @@ export const fetchCompanies = createAsyncThunk(
     }
   }
 )
+export const updateCompany = createAsyncThunk(
+  'companies/updateCompany',
+  async (
+    {
+      id,
+      payload,
+    }: {
+      id: string
+      payload: {
+        name?: string
+        career_url?: string
+        min_experience_years?: number | null
+        max_experience_years?: number | null
+        roles?: string[]
+        locations?: string[]
+      }
+    },
+    { rejectWithValue, getState }
+  ) => {
+    try {
+      const token = (getState() as RootState).auth.token
+      const response = await request(`/companies/${id}`, {
+        method: 'PATCH',
+        body: payload,
+        token,
+      })
+      return response
+    } catch (e: any) {
+      if (e instanceof Error) {
+        return rejectWithValue(e.message)
+      }
+      return rejectWithValue('Unknown error')
+    }
+  }
+)
