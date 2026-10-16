@@ -79,7 +79,19 @@ function DashboardPage() {
                   </a>
                 </div>
                 <div className="company-actions">
-                  <button type="button" className="btn btn--secondary btn--sm" onClick={() => navigate(`/companies/${company.id}/jobs`)}>
+                  {/* Edit button passes company object in location state */}
+                  <button 
+                    type="button" 
+                    className="btn btn--secondary btn--sm" 
+                    onClick={() => navigate('/add-jobs', { state: { company } })}
+                  >
+                    Edit
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn btn--primary btn--sm" 
+                    onClick={() => navigate(`/companies/${company.id}/jobs`)}
+                  >
                     View Jobs
                   </button>
                 </div>

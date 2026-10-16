@@ -1,8 +1,18 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { addCompany } from '../store/companies/companiesThunks';
+import { addCompany, updateCompany } from '../store/companies/companiesThunks';
 
-export default function AddJobs({ isOpen = true, onClose = () => {} }) {
+export default function AddJobs() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const dispatch = useAppDispatch();
+  const { loading, error } = useAppSelector((state) => state.companies);
+
+  // Check if an existing company was passed through router state for editing
+  const existingCompany = location.state?.company || null;
+  const isEditing = Boolean(existingCompany);
+
   const [name, setName] = useState('');
   const [careerUrl, setCareerUrl] = useState('');
   const [minExp, setMinExp] = useState('');
@@ -11,8 +21,17 @@ export default function AddJobs({ isOpen = true, onClose = () => {} }) {
   const [locations, setLocations] = useState('');
   const [toast, setToast] = useState<string | null>(null);
 
-  const dispatch = useAppDispatch();
-  const { loading, error } = useAppSelector((state) => state.companies);
+  // Pre-fill fields if we are editing an existing company
+  useEffect(() => {
+    if (isEditing && existingCompany) {
+      setName(existingCompany.name || '');
+      setCareerUrl(existingCompany.career_url || '');
+      setMinExp(existingCompany.min_experience_years !== null ? String(existingCompany.min_experience_years) : '');
+      setMaxExp(existingCompany.max_experience_years !== null ? String(existingCompany.max_experience_years) : '');
+      setRoles(existingCompany.roles ? existingCompany.roles.join(', ') : '');
+      setLocations(existingCompany.locations ? existingCompany.locations.join(', ') : '');
+    }
+  }, [isEditing, existingCompany]);
 
   useEffect(() => {
     if (toast) {
@@ -24,16 +43,7 @@ export default function AddJobs({ isOpen = true, onClose = () => {} }) {
   }, [toast]);
 
   const handleCancel = () => {
-    // Reset form state
-    setName('');
-    setCareerUrl('');
-    setMinExp('');
-    setMaxExp('');
-    setRoles('');
-    setLocations('');
-
-    // Trigger parent close / navigation handler
-    onClose();
+    navigate('/dashboard');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,32 +59,50 @@ export default function AddJobs({ isOpen = true, onClose = () => {} }) {
     };
 
     try {
-      await dispatch(addCompany(payload)).unwrap();
-      setToast('Company added successfully');
-    } finally {
-      // Reset form fields
-      setName('');
-      setCareerUrl('');
-      setMinExp('');
-      setMaxExp('');
-      setRoles('');
-      setLocations('');
+      if (isEditing) {
+        // Call PATCH /companies/{id} via updateCompany thunk
+        await dispatch(updateCompany({ id: existingCompany.id, payload })).unwrap();
+        setToast('Company updated successfully');
+      } else {
+        // Call POST /companies via addCompany thunk
+        await dispatch(addCompany(payload)).unwrap();
+        setToast('Company added successfully');
+        
+        // Clear fields only when adding a new one
+        setName('');
+        setCareerUrl('');
+        setMinExp('');
+        setMaxExp('');
+        setRoles('');
+        setLocations('');
+      }
+
+      // Redirect back to dashboard after a brief delay
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1000);
+    } catch (err) {
+      console.error('Failed to save company:', err);
     }
   };
-
-  if (!isOpen) return null;
 
   return (
     <section className="dashboard">
       <div className="container">
         <div className="dashboard__header">
-          <h1>Track New Career Page</h1>
-          <p>Add a new career page to track job postings.</p>
+          <h1>{isEditing ? 'Edit Tracked Company' : 'Track New Career Page'}</h1>
+          <p>{isEditing ? 'Update your filters and configurations.' : 'Add a new career page to track job postings.'}</p>
         </div>
 
         {toast && (
-          <div className="toast">
+          <div className="toast" style={{ marginBottom: '16px', padding: '10px', background: '#dcfce7', color: '#166534', borderRadius: '4px' }}>
             {toast}
+          </div>
+        )}
+
+        {error && (
+          <div className="ac-error-banner" style={{ marginBottom: '16px' }}>
+            {error}
           </div>
         )}
 
@@ -155,16 +183,10 @@ export default function AddJobs({ isOpen = true, onClose = () => {} }) {
               Cancel
             </button>
             <button type="submit" className="ac-btn-primary" disabled={loading}>
-              {loading ? 'Saving...' : 'Add Company'}
+              {loading ? 'Saving...' : isEditing ? 'Update Company' : 'Add Company'}
             </button>
           </div>
         </form>
-
-        {error && (
-          <div className="ac-error-banner">
-            {error}
-          </div>
-        )}
       </div>
     </section>
   );
