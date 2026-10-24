@@ -1,17 +1,24 @@
-import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAppDispatch, useAppSelector } from '../store/hooks'
-import { fetchCompanies } from '../store/companies/companiesThunks'
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { fetchCompanies } from "../store/companies/companiesThunks";
 
 function DashboardPage() {
-  const navigate = useNavigate()
-  const dispatch = useAppDispatch()
-  const { loading, error, companies } = useAppSelector((s) => s.companies)
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const { loading, error, companies } = useAppSelector((s) => s.companies);
 
   useEffect(() => {
-    dispatch(fetchCompanies())
-  }, [dispatch])
+    dispatch(fetchCompanies());
+  }, [dispatch]);
 
+  const getDomain = (url: string) => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
+    }
+  };
   if (loading) {
     return (
       <section className="dashboard">
@@ -22,7 +29,7 @@ function DashboardPage() {
           </div>
         </div>
       </section>
-    )
+    );
   }
 
   if (error) {
@@ -39,21 +46,34 @@ function DashboardPage() {
           </div>
         </div>
       </section>
-    )
+    );
   }
 
   return (
     <section className="dashboard">
       <div className="container">
-        
         {/* Header Section */}
         <div className="dashboard__top-bar">
           <div>
-            <h1>Welcome{companies.length > 0 ? `, you have ${companies.length} company tracked` : ''} 👋</h1>
-            <p>{companies.length === 0 ? 'No companies tracked yet. Add a career page to start getting alerts.' : 'Here is where your tracked companies and live job updates appear.'}</p>
+            <h1>
+              Welcome
+              {companies.length > 0
+                ? `, you have ${companies.length} company tracked`
+                : ""}{" "}
+              👋
+            </h1>
+            <p>
+              {companies.length === 0
+                ? "No companies tracked yet. Add a career page to start getting alerts."
+                : "Here is where your tracked companies and live job updates appear."}
+            </p>
           </div>
           {companies.length > 0 && (
-            <button type="button" className="btn btn--primary" onClick={() => navigate('/add-jobs')}>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => navigate("/add-jobs")}
+            >
               + Add another company
             </button>
           )}
@@ -63,8 +83,15 @@ function DashboardPage() {
         {companies.length === 0 ? (
           <div className="card empty-state">
             <h2>No companies tracked yet</h2>
-            <p>Add a career page to start getting alerts for roles that match you.</p>
-            <button type="button" className="btn btn--primary" onClick={() => navigate('/add-jobs')}>
+            <p>
+              Add a career page to start getting alerts for roles that match
+              you.
+            </p>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => navigate("/add-jobs")}
+            >
               Add company
             </button>
           </div>
@@ -74,35 +101,43 @@ function DashboardPage() {
               <div key={company.id} className="card company-card">
                 <div className="company-info">
                   <h3>{company.name}</h3>
-                  <a href={company.career_url} target="_blank" rel="noreferrer" className="company-url">
-                    {company.career_url}
+                  <a
+                    href={company.career_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="company-url"
+                  >
+                    🔗 {getDomain(company.career_url)}
                   </a>
                 </div>
                 <div className="company-actions">
                   {/* Edit button passes company object in location state */}
-                  <button 
-                    type="button" 
-                    className="btn btn--secondary btn--sm" 
-                    onClick={() => navigate('/add-jobs', { state: { company } })}
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--sm"
+                    onClick={() =>
+                      navigate("/add-jobs", { state: { company } })
+                    }
                   >
                     Edit
                   </button>
-                  <button 
-                    type="button" 
-                    className="btn btn--primary btn--sm" 
-                    onClick={() => navigate(`/companies/${company.id}/jobs`)}
+                  <a
+                    href={company.career_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn--pricompaniesmary btn--sm"
+                    style={{ textDecoration: "none", textAlign: "center" }}
                   >
-                    View Jobs
-                  </button>
+                    Career Page ↗
+                  </a>
                 </div>
               </div>
             ))}
           </div>
         )}
-
       </div>
     </section>
-  )
+  );
 }
 
-export default DashboardPage
+export default DashboardPage;
