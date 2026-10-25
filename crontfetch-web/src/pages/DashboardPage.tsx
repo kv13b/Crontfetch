@@ -1,7 +1,10 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
-import { fetchCompanies } from "../store/companies/companiesThunks";
+import {
+  deleteCompany,
+  fetchCompanies,
+} from "../store/companies/companiesThunks";
 
 function DashboardPage() {
   const navigate = useNavigate();
@@ -130,6 +133,26 @@ function DashboardPage() {
                   >
                     Career Page ↗
                   </a>
+                  <button
+                    type="button"
+                    className="btn btn--danger btn--sm"
+                    style={{
+                      background: "#fee2e2",
+                      color: "#991b1b",
+                      border: "none",
+                    }}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Are you sure you want to stop tracking ${company.name}?`,
+                        )
+                      ) {
+                        dispatch(deleteCompany(company.id));
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             ))}

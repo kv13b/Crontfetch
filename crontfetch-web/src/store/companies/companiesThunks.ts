@@ -85,3 +85,18 @@ export const updateCompany = createAsyncThunk(
     }
   }
 )
+export const deleteCompany = createAsyncThunk(
+  'companies/deleteCompany',
+  async (id: string, { getState, rejectWithValue }) => {
+    try {
+      const { auth } = getState() as { auth: { token: string } };
+      await request(`/companies/${id}`, {
+        method: 'DELETE',
+        token: auth.token,
+      });
+      return id; // Return the ID so we can filter it out of state
+    } catch (err: any) {
+      return rejectWithValue(err.message || 'Failed to delete company');
+    }
+  }
+);
