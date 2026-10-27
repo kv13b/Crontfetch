@@ -434,3 +434,47 @@ func listCompaniesByUser(ctx context.Context, pool *pgxpool.Pool, userID string)
 	}
 	return companies, rows.Err()
 }
+
+// DeleteCompany handles DELETE /companies/{id}: removes a tracked career page
+// belonging to the authenticated user.
+func DeleteCompany(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := middleware.ClaimsFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "missing or invalid authorization token")
+			return
+		}
+
+		id := r.PathValue("id")
+		rowsAffected, err := deleteCompanyRecord(r.Context(), pool, claims.UserID, id)
+		if err != nil {
+			if isCompanyNotFound(err) {
+				writeError(w, http.StatusNotFound, "company not found")
+				return
+			}
+			slog.Error("delete company: deleting", "error", err, "company_id", id, "user_id", claims.UserID)
+			writeError(w, http.StatusInternalServerError, "could not delete company")
+			return
+		}
+
+		if rowsAffected == 0 {
+			writeError(w, http.StatusNotFound, "company not found")
+			return
+		}
+
+		slog.Info("company: deleted", "company_id", id, "user_id", claims.UserID)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func deleteCompanyRecord(ctx context.Context, pool *pgxpool.Pool, userID, id string) (int64, error) {
+	const query = `
+		DELETE FROM companies
+		WHERE id = $1 AND user_id = $2
+	`
+	result, err := pool.Exec(ctx, query, id, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

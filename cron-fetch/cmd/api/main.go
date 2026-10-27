@@ -51,7 +51,7 @@ func main() {
 	mux.Handle("GET /companies", middleware.Auth(cfg.JWTSecret)(handlers.ListCompanies(pool)))
 	mux.Handle("PATCH /companies/{id}", middleware.Auth(cfg.JWTSecret)(handlers.UpdateCompany(pool)))
 	mux.Handle("GET /companies/{id}/jobs", middleware.Auth(cfg.JWTSecret)(handlers.CompanyJobs(pool)))
-
+	mux.Handle("DELETE /companies/{id}", middleware.Auth(cfg.JWTSecret)(handlers.DeleteCompany(pool)))
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
