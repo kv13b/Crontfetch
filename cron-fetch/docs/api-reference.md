@@ -61,6 +61,9 @@ These appear nested in several responses below.
   "max_experience_years": null,
   "roles": ["engineer"],
   "locations": [],
+  "office_address": "Koramangala, Bengaluru",
+  "lat": 12.9357366,
+  "lng": 77.624081,
   "created_at": "2026-10-01T06:58:53.04Z",
   "updated_at": "2026-10-01T06:58:53.04Z"
 }
@@ -72,6 +75,8 @@ These appear nested in several responses below.
   open range on that side, not zero.
 - `roles`/`locations` are `[]` when unset, meaning "no constraint" (every
   job matches), not "matches nothing."
+- `office_address` is `""` and `lat`/`lng` are `null` until a location is
+  set with `PUT /companies/{id}/location`.
 
 **Job** (only appears inside a jobs response, never has its own endpoint)
 ```json
@@ -231,7 +236,17 @@ Behavior specific to update:
 | 404 | `{"error":"company not found"}` | wrong id, malformed id, or belongs to another user — same response for all three, so this can't be used to probe which ids exist |
 | 409 | `{"error":"you're already tracking this career page"}` | the new `career_url` collides with another company this user already has |
 
-**There is no `DELETE /companies/{id}` yet.**
+## `DELETE /companies/{id}`
+
+Auth: required. Stops tracking the company.
+
+**Success — `204`**, no body.
+
+**Errors**
+| Status | Body | When |
+|---|---|---|
+| 401 | `{"error":"missing or invalid authorization token"}` | |
+| 404 | `{"error":"company not found"}` | wrong id, malformed id, or another user's company |
 
 ## `GET /companies/{id}/jobs`
 
@@ -273,6 +288,85 @@ frontend to show a loading state, not expect an instant response.
 | 422 | `{"error":"this site's job board name couldn't be worked out — save the company with its platform and board name"}` | |
 | 422 | `{"error":"no job board found with the saved board name"}` | wrong `board` value |
 | 502 | `{"error":"could not fetch jobs from the career page"}` | the career site itself errored or timed out |
+
+---
+
+## `PUT /companies/{id}/location`
+
+Auth: required. Sets the company's office location.
+
+**Request** — either a pin:
+```json
+{ "office_address": "MG Road", "lat": 12.9756, "lng": 77.6066 }
+```
+or just an address, which the server looks up (Nominatim, OpenStreetMap):
+```json
+{ "office_address": "Koramangala, Bengaluru" }
+```
+`{}` clears the location. An address lookup can take a second or two.
+
+**Success — `200`** — the updated `Company` object.
+
+**Errors**
+| Status | Body | When |
+|---|---|---|
+| 400 | `{"error":"invalid request body"}` | malformed JSON |
+| 400 | `{"error":"lat and lng must be sent together"}` | |
+| 400 | `{"error":"lat must be -90..90 and lng -180..180"}` | |
+| 400 | `{"error":"couldn't find that address; try a fuller address or drop a pin on the map"}` | no geocoding result |
+| 401 | `{"error":"missing or invalid authorization token"}` | |
+| 404 | `{"error":"company not found"}` | |
+| 502 | `{"error":"address lookup failed, try again or drop a pin on the map"}` | Nominatim errored or timed out |
+
+## `GET /nearby`
+
+Auth: required. `GET /nearby?lat=12.9716&lng=77.5946&radius_km=10`
+
+`radius_km` is optional (default `10`, max `50`).
+
+**Success — `200`** — the caller's companies with a location inside the
+radius, closest first: each is a `Company` object plus `distance_km`.
+```json
+[ { "...Company...", "distance_km": 1.37 } ]
+```
+`[]` if none.
+
+**Errors**
+| Status | Body | When |
+|---|---|---|
+| 400 | `{"error":"lat and lng query parameters are required"}` | missing, not numbers, or out of range |
+| 400 | `{"error":"radius_km must be between 0 and 50"}` | |
+| 401 | `{"error":"missing or invalid authorization token"}` | |
+
+## `GET /nearby/places`
+
+Auth: required. Same query parameters as `/nearby`. Returns named offices
+from OpenStreetMap around the point, tracked or not, closest first. **Can
+take several seconds** on a cache miss; cached for 24 hours per ~1 km area.
+
+**Success — `200`**
+```json
+[
+  {
+    "id": "osm:node/123456",
+    "name": "Example Software Pvt Ltd",
+    "kind": "it",
+    "website": "https://example.com",
+    "address": "80 Feet Rd, Bengaluru",
+    "lat": 12.9352,
+    "lng": 77.6245,
+    "distance_km": 4.9
+  }
+]
+```
+`website` and `address` are `""` when OSM has no value.
+
+**Errors**
+| Status | Body | When |
+|---|---|---|
+| 400 | same as `/nearby` | |
+| 401 | `{"error":"missing or invalid authorization token"}` | |
+| 502 | `{"error":"map data service is busy, try again in a minute"}` | Overpass errored or timed out |
 
 ---
 

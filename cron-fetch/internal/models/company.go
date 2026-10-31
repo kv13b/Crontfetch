@@ -15,6 +15,9 @@ type Company struct {
 	MaxExperienceYears *int      `json:"max_experience_years"`
 	Roles              []string  `json:"roles"`
 	Locations          []string  `json:"locations"`
+	OfficeAddress      string    `json:"office_address"`
+	Lat                *float64  `json:"lat"`
+	Lng                *float64  `json:"lng"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }

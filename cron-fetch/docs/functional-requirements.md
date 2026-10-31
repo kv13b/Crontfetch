@@ -99,6 +99,10 @@ matching its saved `roles`/`locations` filters.
   couldn't be read (unrecognised, or a recognised-but-unsupported vendor
   such as Taleo), `422` a saved board name doesn't exist on that platform.
 
+### `DELETE /companies/{id}`
+Stops tracking a company. Returns `204`, or `404` if it doesn't exist or
+belongs to someone else.
+
 ### Validation rules (create and update)
 - `name`, `career_url` required (create only — update requires at least one field).
 - `career_url` must start with `http://` or `https://`.
@@ -152,9 +156,47 @@ across all users:
    backlog of matches would immediately flood Telegram.
 4. **Every sync after that:** sends a Telegram message for each job that
    wasn't recorded before, then records it.
+5. Every job seen again has its `last_seen_at` refreshed (and `closed_at`
+   cleared). Nothing sets `closed_at` yet.
 
 Notifications go to a single fixed Telegram chat (`TELEGRAM_CHAT_ID`), not
 per-user — see [non-functional-requirements.md](non-functional-requirements.md).
+
+## Locations and nearby companies
+
+Free OpenStreetMap services only: Nominatim for address lookup and Overpass
+for finding offices. All routes below require `Authorization: Bearer <token>`.
+
+### `PUT /companies/{id}/location`
+Sets where a tracked company's office is.
+
+- **Body:** `{office_address?, lat?, lng?}`
+  - `lat` + `lng` sent (e.g. a pin dropped on the map): saved as-is.
+  - Only `office_address` sent: looked up with Nominatim, and the result's
+    coordinates are saved along with the address.
+  - Neither: the location is cleared.
+- **Response (200):** the updated company, now including `office_address`,
+  `lat`, `lng`.
+- **Errors:** `400` only one of `lat`/`lng`, out-of-range coordinates, or an
+  address Nominatim can't find; `404` no such company; `502` the address
+  lookup service failed.
+- Nominatim allows one request per second, so lookups are queued and spaced
+  out server-side.
+
+### `GET /nearby?lat=&lng=&radius_km=`
+The caller's tracked companies whose office is within `radius_km` (default
+10, max 50) of the given point, closest first, each with `distance_km`.
+Companies without a location are left out. Distance is the straight-line
+(haversine) distance.
+
+### `GET /nearby/places?lat=&lng=&radius_km=`
+Named offices from OpenStreetMap near the point (`office` = company, it,
+software, telecommunication, engineering, consulting, research, financial,
+insurance, estate_agent, advertising_agency, logistics), whether or not the
+user tracks them. Each has a name, kind, and, when OSM has them, a website
+and address. Results are cached for 24 hours per ~1 km grid cell, and only
+one upstream query runs at a time. Returns `502` if Overpass is busy or
+down. Coverage depends on what OSM volunteers have mapped.
 
 ## `GET /health`
 Liveness/readiness check. Returns `{"status": "online", "db": "online"|"unreachable"}`,

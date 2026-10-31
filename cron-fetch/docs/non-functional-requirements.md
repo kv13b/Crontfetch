@@ -22,7 +22,9 @@ For the full list of endpoints and exactly what each does, see
   `.sql` files in `migrations/`, applied by hand in the order they're
   numbered (no migration tool wired in yet).
 - **External services:** each supported career platform's own API (or, for
-  TalentBrew, HTML scraping), plus the Telegram Bot API for notifications.
+  TalentBrew, HTML scraping), the Telegram Bot API for notifications, and
+  two free OpenStreetMap services: Nominatim (address → coordinates) and
+  Overpass (offices near a point). No paid map or geocoding API is used.
 - **Auth:** stateless JWTs (HS256), no server-side session store.
 
 ## Performance
@@ -42,6 +44,13 @@ For the full list of endpoints and exactly what each does, see
   over every tracked company must finish before the timer's next tick is
   honored, so a very large number of tracked companies (or several slow
   ones) can make the effective check interval longer than configured.
+
+- **Map lookups are rate-limited by design.** Nominatim allows one request
+  per second, so the server queues address lookups and spaces them out.
+  Overpass queries run one at a time and are cached for 24 hours per ~1 km
+  grid cell; a cache miss can take several seconds, or time out when the
+  public server is busy. `/nearby` itself is fast: it only reads the
+  database and computes distances in memory.
 
 ## Reliability
 
@@ -69,6 +78,9 @@ For the full list of endpoints and exactly what each does, see
   private IP ranges) before this is exposed to untrusted users.
 - **Secrets** (`JWT_SECRET`, `TELEGRAM_BOT_TOKEN`, `DATABASE_URL`) are read
   from environment variables / `.env`, never committed.
+- **Location privacy.** The user's own position is only sent as query
+  parameters to `/nearby` and `/nearby/places`; it isn't stored. Only
+  company office locations are saved.
 
 ## Scalability and multi-tenancy
 
@@ -78,7 +90,10 @@ For the full list of endpoints and exactly what each does, see
   `telegram_chat_id` per user (and its own opt-in/verification flow) to
   support multiple people meaningfully.
 - **The `jobs` table grows without bound.** Nothing prunes old job records,
-  even for postings long since filled or removed.
+  even for postings long since filled or removed. `jobs.last_seen_at` is now
+  kept up to date, which is the basis for pruning later.
+- **The Overpass cache is in memory.** It's lost on restart and not shared
+  between instances.
 - **No horizontal scaling story.** A single process serves the API and runs
   the sync loop; running more than one instance would sync (and notify)
   duplicately, since nothing coordinates between instances.
@@ -96,6 +111,10 @@ For the full list of endpoints and exactly what each does, see
   validated but not applied to job matching — doing so needs fetching each
   shortlisted job's full description and parsing free text for a stated
   range.
-- No `DELETE /companies/{id}`.
+- `/nearby` searches only the caller's own tracked companies; there is no
+  shared company directory yet.
+- `jobs.closed_at` exists but is never set: the sync only sees jobs that
+  pass the company's filter, so it can't tell "closed" from "no longer
+  matching".
 - Several career platforms are recognised but not fetchable (see
   functional-requirements.md).

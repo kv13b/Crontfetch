@@ -365,7 +365,7 @@ func cleanStrings(values []string) []string {
 }
 
 // companyColumns and scanCompany must stay in the same order.
-const companyColumns = `id, user_id, name, career_url, platform, board, min_experience_years, max_experience_years, roles, locations, created_at, updated_at`
+const companyColumns = `id, user_id, name, career_url, platform, board, min_experience_years, max_experience_years, roles, locations, office_address, lat, lng, created_at, updated_at`
 
 // rowScanner is satisfied by both pgx.Row and pgx.Rows.
 type rowScanner interface {
@@ -377,6 +377,7 @@ func scanCompany(row rowScanner) (models.Company, error) {
 	err := row.Scan(
 		&c.ID, &c.UserID, &c.Name, &c.CareerURL, &c.Platform, &c.Board,
 		&c.MinExperienceYears, &c.MaxExperienceYears, &c.Roles, &c.Locations,
+		&c.OfficeAddress, &c.Lat, &c.Lng,
 		&c.CreatedAt, &c.UpdatedAt,
 	)
 	return c, err
