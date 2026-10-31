@@ -514,3 +514,70 @@
   padding-top: var(--space-4);
   margin-top: auto;
 }
+/* Jobs around me */
+.nearby {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.nearby__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.nearby-map {
+  height: 420px;
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  z-index: 0;
+}
+
+.nearby-map--picking {
+  cursor: crosshair;
+}
+
+.nearby__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.nearby__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.nearby__item > div:first-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.nearby__distance {
+  font-weight: var(--fw-semibold);
+  color: var(--color-success);
+}
+
+.nearby__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .nearby-map {
+    height: 300px;
+  }
+
+  .nearby__item {
+    grid-template-columns: 1fr;
+  }
+}
