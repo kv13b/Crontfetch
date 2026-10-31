@@ -77,16 +77,19 @@ func recordNewJobs(ctx context.Context, pool *pgxpool.Pool, companyID string, jo
 	const query = `
 		INSERT INTO jobs (company_id, external_id, title, location, url)
 		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (company_id, external_id) DO NOTHING
+		ON CONFLICT (company_id, external_id) DO UPDATE
+			SET last_seen_at = now(), closed_at = NULL
+		RETURNING (xmax = 0)
 	`
 
 	var newJobs []fetcher.Job
 	for _, j := range jobs {
-		tag, err := pool.Exec(ctx, query, companyID, j.ID, j.Title, j.Location, j.URL)
+		var inserted bool
+		err := pool.QueryRow(ctx, query, companyID, j.ID, j.Title, j.Location, j.URL).Scan(&inserted)
 		if err != nil {
 			return nil, err
 		}
-		if tag.RowsAffected() > 0 {
+		if inserted {
 			newJobs = append(newJobs, j)
 		}
 	}

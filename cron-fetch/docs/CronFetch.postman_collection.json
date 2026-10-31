@@ -8,13 +8,29 @@
   "auth": {
     "type": "bearer",
     "bearer": [
-      { "key": "token", "value": "{{token}}", "type": "string" }
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
     ]
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:8080", "type": "string" },
-    { "key": "token", "value": "", "type": "string" },
-    { "key": "company_id", "value": "", "type": "string" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "company_id",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
     {
@@ -25,7 +41,9 @@
           "request": {
             "method": "GET",
             "header": [],
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "url": "{{base_url}}/health"
           },
           "event": [
@@ -50,8 +68,15 @@
           "name": "POST /signup",
           "request": {
             "method": "POST",
-            "header": [ { "key": "Content-Type", "value": "application/json" } ],
-            "auth": { "type": "noauth" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"name\": \"Karthik\", \"email\": \"you@example.com\", \"password\": \"yourpassword123\"}"
@@ -75,8 +100,15 @@
           "name": "POST /login",
           "request": {
             "method": "POST",
-            "header": [ { "key": "Content-Type", "value": "application/json" } ],
-            "auth": { "type": "noauth" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"email\": \"you@example.com\", \"password\": \"yourpassword123\"}"
@@ -124,7 +156,12 @@
           "name": "POST /companies (Linear, Ashby)",
           "request": {
             "method": "POST",
-            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\"name\": \"Linear\", \"career_url\": \"https://jobs.ashbyhq.com/linear\", \"min_experience_years\": 2, \"max_experience_years\": 6, \"roles\": [\"engineer\"], \"locations\": [\"Remote\"]}"
@@ -148,7 +185,12 @@
           "name": "POST /companies (Valtech, own careers page)",
           "request": {
             "method": "POST",
-            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\"name\": \"Valtech\", \"career_url\": \"https://www.valtech.com/en-in/career/jobs/\", \"platform\": \"greenhouse\", \"board\": \"valtech\", \"roles\": [\"developer\", \"engineer\"], \"locations\": [\"India\"]}"
@@ -191,7 +233,12 @@
           "name": "PATCH /companies/{id} (change min experience)",
           "request": {
             "method": "PATCH",
-            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\"min_experience_years\": 5}"
@@ -229,6 +276,115 @@
               }
             }
           ]
+        },
+        {
+          "name": "DELETE /companies/{id}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/companies/{{company_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Locations and nearby",
+      "item": [
+        {
+          "name": "PUT /companies/{id}/location (address lookup)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/companies/{{company_id}}/location",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"office_address\": \"Koramangala, Bengaluru\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has coordinates\", () => pm.expect(pm.response.json().lat).to.be.a(\"number\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /companies/{id}/location (map pin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/companies/{{company_id}}/location",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"office_address\": \"MG Road\", \"lat\": 12.9756, \"lng\": 77.6066}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /nearby",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/nearby?lat=12.9716&lng=77.5946&radius_km=10"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"is an array\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /nearby/places (OpenStreetMap offices)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/nearby/places?lat=12.9716&lng=77.5946&radius_km=10"
+          }
         }
       ]
     }

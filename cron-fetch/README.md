@@ -74,6 +74,7 @@ docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch < migrations
 docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch < migrations/004_add_filters_to_companies.sql
 docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch < migrations/005_add_platform_to_companies.sql
 docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch < migrations/006_create_jobs_table.sql
+docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch < migrations/007_add_geo_and_job_status.sql
 ```
 
 When adding a schema change, create a new numbered file rather than editing

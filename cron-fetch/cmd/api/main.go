@@ -12,6 +12,7 @@ import (
 
 	"github.com/kv13b/Crontfetch/internal/config"
 	"github.com/kv13b/Crontfetch/internal/db"
+	"github.com/kv13b/Crontfetch/internal/geo"
 	"github.com/kv13b/Crontfetch/internal/handlers"
 	"github.com/kv13b/Crontfetch/internal/jobsync"
 	"github.com/kv13b/Crontfetch/internal/middleware"
@@ -42,6 +43,9 @@ func main() {
 		go runJobSync(ctx, pool, cfg)
 	}
 
+	geocoder := geo.NewNominatim()
+	places := geo.NewOverpass()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", handlers.Health(pool))
 	mux.HandleFunc("POST /signup", handlers.Signup(pool, cfg.JWTSecret))
@@ -52,6 +56,9 @@ func main() {
 	mux.Handle("PATCH /companies/{id}", middleware.Auth(cfg.JWTSecret)(handlers.UpdateCompany(pool)))
 	mux.Handle("GET /companies/{id}/jobs", middleware.Auth(cfg.JWTSecret)(handlers.CompanyJobs(pool)))
 	mux.Handle("DELETE /companies/{id}", middleware.Auth(cfg.JWTSecret)(handlers.DeleteCompany(pool)))
+	mux.Handle("PUT /companies/{id}/location", middleware.Auth(cfg.JWTSecret)(handlers.SetCompanyLocation(pool, geocoder)))
+	mux.Handle("GET /nearby", middleware.Auth(cfg.JWTSecret)(handlers.Nearby(pool)))
+	mux.Handle("GET /nearby/places", middleware.Auth(cfg.JWTSecret)(handlers.NearbyPlaces(places)))
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
