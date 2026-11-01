@@ -2,16 +2,21 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addCompany, updateCompany } from '../store/companies/companiesThunks';
+import { setCompanyLocation } from '../services/nearbyService';
+import type { TrackPrefill } from '../services/nearbyService';
 
 export default function AddJobs() {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((state) => state.companies);
+  const token = useAppSelector((state) => state.auth.token);
 
   // Check if an existing company was passed through router state for editing
   const existingCompany = location.state?.company || null;
   const isEditing = Boolean(existingCompany);
+  // Set when arriving from "Track this company" on Jobs around me.
+  const prefill: TrackPrefill | null = location.state?.prefill || null;
 
   const [name, setName] = useState('');
   const [careerUrl, setCareerUrl] = useState('');
@@ -30,8 +35,11 @@ export default function AddJobs() {
       setMaxExp(existingCompany.max_experience_years !== null ? String(existingCompany.max_experience_years) : '');
       setRoles(existingCompany.roles ? existingCompany.roles.join(', ') : '');
       setLocations(existingCompany.locations ? existingCompany.locations.join(', ') : '');
+    } else if (prefill) {
+      setName(prefill.name);
+      setCareerUrl(prefill.career_url);
     }
-  }, [isEditing, existingCompany]);
+  }, [isEditing, existingCompany, prefill]);
 
   useEffect(() => {
     if (toast) {
@@ -43,7 +51,7 @@ export default function AddJobs() {
   }, [toast]);
 
   const handleCancel = () => {
-    navigate('/dashboard');
+    navigate(prefill ? '/nearby' : '/dashboard');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,7 +73,20 @@ export default function AddJobs() {
         setToast('Company updated successfully');
       } else {
         // Call POST /companies via addCompany thunk
-        await dispatch(addCompany(payload)).unwrap();
+        const created = (await dispatch(addCompany(payload)).unwrap()) as { id: string };
+        // Carry over the office location from the map so it shows as a
+        // tracked pin straight away. The company is saved either way.
+        if (prefill) {
+          try {
+            await setCompanyLocation(token, created.id, {
+              office_address: prefill.office_address,
+              lat: prefill.lat,
+              lng: prefill.lng,
+            });
+          } catch (locErr) {
+            console.error('Saved the company but not its office location:', locErr);
+          }
+        }
         setToast('Company added successfully');
         
         // Clear fields only when adding a new one
@@ -79,7 +100,7 @@ export default function AddJobs() {
 
       // Redirect back to dashboard after a brief delay
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate(prefill ? '/nearby' : '/dashboard');
       }, 1000);
     } catch (err) {
       console.error('Failed to save company:', err);
@@ -91,7 +112,15 @@ export default function AddJobs() {
       <div className="container">
         <div className="dashboard__header">
           <h1>{isEditing ? 'Edit Tracked Company' : 'Track New Career Page'}</h1>
-          <p>{isEditing ? 'Update your filters and configurations.' : 'Add a new career page to track job postings.'}</p>
+          <p>
+            {isEditing
+              ? 'Update your filters and configurations.'
+              : prefill
+                ? prefill.career_url
+                  ? `Check the career page link for ${prefill.name}, then add it.`
+                  : `OpenStreetMap has no website for ${prefill.name}. Paste its career page link to track it.`
+                : 'Add a new career page to track job postings.'}
+          </p>
         </div>
 
         {toast && (
