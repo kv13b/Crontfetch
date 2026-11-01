@@ -1,18 +1,24 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import FilterBar from '../components/FilterBar'
 import GoOnlineToggle from '../components/GoOnlineToggle'
 import NearbyMap from '../components/NearbyMap'
-import { fetchNearby, setCompanyLocation } from '../services/nearbyService'
-import type { Company, NearbyCompany } from '../services/nearbyService'
+import { fetchNearby, fetchNearbyPlaces, setCompanyLocation } from '../services/nearbyService'
+import type { Company, NearbyCompany, NearbyPlace, TrackPrefill } from '../services/nearbyService'
 import { fetchCompanies } from '../store/companies/companiesThunks'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 
 const RADIUS_KM = 10
 // Used when the browser can't or won't share a location (central Bangalore).
 const FALLBACK_POSITION: [number, number] = [12.9716, 77.5946]
+// How many "companies around you" rows to show before "Show all".
+const LIST_PREVIEW = 30
+
+const normalizeName = (name: string) => name.trim().toLowerCase()
 
 function NearbyPage() {
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
   const token = useAppSelector((s) => s.auth.token)
   const companies = useAppSelector((s) => s.companies.companies) as Company[]
 
@@ -21,6 +27,11 @@ function NearbyPage() {
   const [nearby, setNearby] = useState<NearbyCompany[]>([])
   const [error, setError] = useState<string | null>(null)
   const [pickingFor, setPickingFor] = useState<Company | null>(null)
+  const [places, setPlaces] = useState<NearbyPlace[]>([])
+  const [placesLoading, setPlacesLoading] = useState(false)
+  const [placesError, setPlacesError] = useState<string | null>(null)
+  const [placesQuery, setPlacesQuery] = useState('')
+  const [showAllPlaces, setShowAllPlaces] = useState(false)
 
   const locate = useCallback(() => {
     if (!navigator.geolocation) {
@@ -61,6 +72,44 @@ function NearbyPage() {
     loadNearby()
   }, [loadNearby])
 
+  // Separate from loadNearby: the OpenStreetMap lookup can take a while on
+  // the first visit to an area, and shouldn't hold up tracked companies.
+  useEffect(() => {
+    if (!position) return
+    let cancelled = false
+    setPlacesLoading(true)
+    setPlacesError(null)
+    fetchNearbyPlaces(token, position[0], position[1], RADIUS_KM)
+      .then((p) => !cancelled && setPlaces(p))
+      .catch((e) => !cancelled && setPlacesError(e instanceof Error ? e.message : 'Could not load companies around you'))
+      .finally(() => !cancelled && setPlacesLoading(false))
+    return () => {
+      cancelled = true
+    }
+  }, [position, token])
+
+  // Offices the user already tracks show as green pins, so drop them here.
+  const untrackedPlaces = useMemo(() => {
+    const tracked = new Set(companies.map((c) => normalizeName(c.name)))
+    return places.filter((p) => !tracked.has(normalizeName(p.name)))
+  }, [places, companies])
+
+  const listedPlaces = useMemo(() => {
+    const q = placesQuery.trim().toLowerCase()
+    return q ? untrackedPlaces.filter((p) => p.name.toLowerCase().includes(q)) : untrackedPlaces
+  }, [untrackedPlaces, placesQuery])
+
+  const track = (place: NearbyPlace) => {
+    const prefill: TrackPrefill = {
+      name: place.name,
+      career_url: place.website,
+      office_address: place.address,
+      lat: place.lat,
+      lng: place.lng,
+    }
+    navigate('/add-jobs', { state: { prefill } })
+  }
+
   const saveLocation = async (company: Company, body: { office_address?: string; lat?: number; lng?: number }) => {
     try {
       await setCompanyLocation(token, company.id, body)
@@ -84,7 +133,7 @@ function NearbyPage() {
       <div className="container">
         <div className="dashboard__header">
           <h1>Jobs around me</h1>
-          <p>Your tracked companies within {RADIUS_KM} km, with a Go online switch for match alerts.</p>
+          <p>Companies within {RADIUS_KM} km of you, with a Go online switch for match alerts.</p>
         </div>
 
         <GoOnlineToggle />
@@ -95,7 +144,8 @@ function NearbyPage() {
             <span className="form-hint">
               {pickingFor
                 ? `Click the map to place ${pickingFor.name}'s office.`
-                : (locationNote ?? `${nearby.length} ${nearby.length === 1 ? 'company' : 'companies'} within ${RADIUS_KM} km`)}
+                : (locationNote ??
+                  `${nearby.length} tracked · ${placesLoading ? 'finding companies around you…' : `${untrackedPlaces.length} more around you`}`)}
             </span>
             {pickingFor ? (
               <button type="button" className="btn btn--secondary btn--sm" onClick={() => setPickingFor(null)}>
@@ -119,6 +169,8 @@ function NearbyPage() {
               position={position}
               radiusKm={RADIUS_KM}
               companies={nearby}
+              places={untrackedPlaces}
+              onTrack={track}
               onPick={pickingFor ? onPick : undefined}
             />
           )}
@@ -138,6 +190,55 @@ function NearbyPage() {
                 </li>
               ))}
             </ul>
+          )}
+        </div>
+
+        <div className="card nearby">
+          <div className="nearby__bar">
+            <h2>Companies around you</h2>
+            {untrackedPlaces.length > 0 && (
+              <input
+                className="input nearby__search"
+                placeholder="Search by name"
+                value={placesQuery}
+                onChange={(e) => setPlacesQuery(e.target.value)}
+              />
+            )}
+          </div>
+          <p className="form-hint">
+            Offices within {RADIUS_KM} km from OpenStreetMap. Track one to check its career page for matching jobs.
+          </p>
+
+          {placesLoading && <p className="form-hint">Finding companies around you… the first look at an area can take up to a minute.</p>}
+          {placesError && (
+            <p className="alert alert--error" role="alert">
+              {placesError}
+            </p>
+          )}
+          {!placesLoading && !placesError && untrackedPlaces.length === 0 && position && (
+            <p className="form-hint">No offices found around here in OpenStreetMap.</p>
+          )}
+
+          {listedPlaces.length > 0 && (
+            <ul className="nearby__list">
+              {(showAllPlaces ? listedPlaces : listedPlaces.slice(0, LIST_PREVIEW)).map((p) => (
+                <li key={p.id} className="nearby__item">
+                  <div>
+                    <strong>{p.name}</strong>
+                    <span className="form-hint">{p.address || p.kind}</span>
+                  </div>
+                  <span className="nearby__distance nearby__distance--muted">{p.distance_km.toFixed(1)} km</span>
+                  <button type="button" className="btn btn--secondary btn--sm" onClick={() => track(p)}>
+                    Track
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!showAllPlaces && listedPlaces.length > LIST_PREVIEW && (
+            <button type="button" className="btn btn--secondary btn--sm" onClick={() => setShowAllPlaces(true)}>
+              Show all {listedPlaces.length}
+            </button>
           )}
         </div>
 

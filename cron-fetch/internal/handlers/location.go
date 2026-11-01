@@ -22,7 +22,7 @@ const (
 	defaultNearbyRadiusKm = 10.0
 	maxNearbyRadiusKm     = 50.0
 	geocodeTimeout        = 15 * time.Second
-	placesTimeout         = 45 * time.Second
+	placesTimeout         = 90 * time.Second
 )
 
 // Geocoder turns an address into coordinates. geo.Nominatim satisfies it.
@@ -191,7 +191,7 @@ func NearbyPlaces(finder PlaceFinder) http.HandlerFunc {
 		defer cancel()
 		places, err := finder.Offices(ctx, lat, lng, radius)
 		if err != nil {
-			slog.Error("nearby places: overpass", "error", err)
+			slog.Error("nearby places: lookup", "error", err)
 			writeError(w, http.StatusBadGateway, "map data service is busy, try again in a minute")
 			return
 		}

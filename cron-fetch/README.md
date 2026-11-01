@@ -75,6 +75,7 @@ docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch < migrations
 docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch < migrations/005_add_platform_to_companies.sql
 docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch < migrations/006_create_jobs_table.sql
 docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch < migrations/007_add_geo_and_job_status.sql
+docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch < migrations/008_create_osm_places_table.sql
 ```
 
 When adding a schema change, create a new numbered file rather than editing
@@ -89,6 +90,31 @@ Verify a table's structure:
 ```
 docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch -c '\d users'
 ```
+
+## Importing nearby companies (OpenStreetMap)
+
+"Companies around you" on Jobs around me is served from the `osm_places`
+table, filled from a free OpenStreetMap extract. Without an import, the API
+falls back to public map servers, which are slow and often down.
+
+1. Download the extract covering your area. For Bangalore, Karnataka from
+   OpenStreetMap France (about 130 MB, updated daily):
+   ```
+   curl -L -o karnataka.osm.pbf https://download.openstreetmap.fr/extracts/asia/india/karnataka.osm.pbf
+   ```
+   Other states: https://download.openstreetmap.fr/extracts/asia/india/ ;
+   bigger regions: https://download.geofabrik.de/
+2. Apply `migrations/008_create_osm_places_table.sql` (see Migrations).
+3. Import. The importer only builds with cgo off, so it uses Go's own zlib:
+   ```
+   # PowerShell
+   $env:CGO_ENABLED="0"; go run ./cmd/importplaces -file karnataka.osm.pbf
+   # bash
+   CGO_ENABLED=0 go run ./cmd/importplaces -file karnataka.osm.pbf
+   ```
+   Add `-bbox 12.7,77.3,13.3,77.9` (minLat,minLng,maxLat,maxLng) to import
+   just Bangalore. Re-running replaces the previous import; the running API
+   picks it up without a restart.
 
 ## Running the Go project
 

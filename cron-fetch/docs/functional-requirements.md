@@ -164,8 +164,10 @@ per-user — see [non-functional-requirements.md](non-functional-requirements.md
 
 ## Locations and nearby companies
 
-Free OpenStreetMap services only: Nominatim for address lookup and Overpass
-for finding offices. All routes below require `Authorization: Bearer <token>`.
+Free OpenStreetMap data only: Nominatim for address lookup, and for
+finding offices an import of an OpenStreetMap extract into our own database,
+with the public Overpass and Photon servers as fallbacks. All routes below
+require `Authorization: Bearer <token>`.
 
 ### `PUT /companies/{id}/location`
 Sets where a tracked company's office is.
@@ -191,12 +193,32 @@ Companies without a location are left out. Distance is the straight-line
 
 ### `GET /nearby/places?lat=&lng=&radius_km=`
 Named offices from OpenStreetMap near the point (`office` = company, it,
-software, telecommunication, engineering, consulting, research, financial,
-insurance, estate_agent, advertising_agency, logistics), whether or not the
-user tracks them. Each has a name, kind, and, when OSM has them, a website
-and address. Results are cached for 24 hours per ~1 km grid cell, and only
-one upstream query runs at a time. Returns `502` if Overpass is busy or
-down. Coverage depends on what OSM volunteers have mapped.
+software, telecommunication, engineering, consulting, research, financial),
+whether or not the user tracks them, closest first. Each has a name, kind,
+`source`, and, when OSM has them, a website and address. Coverage depends on
+what OSM volunteers have mapped.
+
+Sources are tried in order until one has data for the area:
+
+1. **`database`**: the `osm_places` table, filled by `cmd/importplaces`
+   (below). Instant, and needs no outside server. Not cached, so a new
+   import shows up straight away.
+2. **`overpass`**: the public Overpass API, trying four mirrors in turn
+   (starting with whichever answered last), within 25 seconds in total.
+3. **`photon`**: komoot's public Photon search: the 50 nearest offices plus
+   one search per common company-name word ("technologies", "software", …)
+   across the area. Gives up at once if the nearest lookup fails.
+
+Results from the public servers are cached for 24 hours per ~5 km grid cell,
+and only one upstream lookup runs at a time. A public source that fails is
+skipped for 10 minutes. Returns `502` only if every source fails.
+
+### Importing offices (`cmd/importplaces`)
+A command, not a route. Reads an `.osm.pbf` extract (e.g. OpenStreetMap
+France's `karnataka.osm.pbf`, which covers Bangalore), keeps named offices of the types
+above, places building outlines at their centre, and replaces the contents
+of `osm_places` in one transaction. An optional `-bbox` limits the import
+(and the replacement) to one area. See the README for how to run it.
 
 ## `GET /health`
 Liveness/readiness check. Returns `{"status": "online", "db": "online"|"unreachable"}`,

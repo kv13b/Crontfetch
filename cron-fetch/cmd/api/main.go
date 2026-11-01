@@ -44,7 +44,10 @@ func main() {
 	}
 
 	geocoder := geo.NewNominatim()
-	places := geo.NewOverpass()
+	// Offices imported with cmd/importplaces come first: instant and
+	// independent of public servers. Areas the import doesn't cover fall
+	// back to Overpass, then Photon (public servers, often overloaded).
+	places := geo.NewPlaces(&geo.DBSource{Pool: pool}, geo.NewOverpass(), geo.NewPhoton())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", handlers.Health(pool))

@@ -581,3 +581,20 @@
     grid-template-columns: 1fr;
   }
 }
+
+.nearby__search {
+  max-width: 240px;
+}
+
+.nearby__distance--muted {
+  color: var(--color-text-muted);
+}
+
+.nearby-popup__muted {
+  color: #5d5d73;
+  font-size: 12px;
+}
+
+.nearby-popup__btn {
+  margin-top: 8px;
+}
