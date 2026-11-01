@@ -1,7 +1,18 @@
 # CronFetch — Execution Plan
 
 Written for: you (the product owner) and anyone who will build this next.
-Status: **planning only. No code has been written for the new features yet.**
+Status (1 Nov 2026): **partly built.** Done so far: the filter bar (Phase 2),
+company office locations with free geocoding, `GET /nearby`, the real map on
+Jobs around me, real offices around the user from an OpenStreetMap import
+(a first step towards the Phase 4 directory), and **Track this company**,
+which finds the career page and copies the filter into Add Jobs. Not
+started: profile on the server, presence and Go online, matching,
+notifications, push, roles. Details and test results:
+[maps-and-nearby.md](maps-and-nearby.md).
+
+One decision changed while building: geocoding uses free Nominatim
+(OpenStreetMap) instead of the Google Geocoding API, so no Google Cloud
+billing is needed (§9 decision 4, §12 item 2).
 
 This plan covers the new user-facing app (post-login screens, nearby job
 alerts, notifications, profile) and how it connects to the existing backend.
@@ -523,4 +534,5 @@ These affect the build. Please answer before Phase 1 starts where marked.
 4. A hosting plan with HTTPS, needed before Phase 6 (and for location on phones).
 5. Go-ahead to start Phase 1 (backend foundation) and Phase 2 (frontend mock screens).
 
-Nothing in this document has been built yet.
+Progress is tracked in the status note at the top and in
+[maps-and-nearby.md](maps-and-nearby.md).

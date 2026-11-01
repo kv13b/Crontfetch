@@ -213,6 +213,28 @@ Results from the public servers are cached for 24 hours per ~5 km grid cell,
 and only one upstream lookup runs at a time. A public source that fails is
 skipped for 10 minutes. Returns `502` only if every source fails.
 
+### `GET /career-page?name=&website=`
+Suggests a career page for a company before it's tracked. Two searches run
+at once, and the best evidence wins:
+
+1. **The company's website** (or, with none on record, `www.<name>.com`):
+   job-board links on the home page, then on `/careers`, `/jobs`, `/career`
+   and `/join-us`, using the same platform detection as `POST /companies`.
+2. **The job boards themselves**, trying board names made from the company
+   name ("Altisource Business Solutions Pvt Ltd" -> `altisource`).
+   Greenhouse, Workable, SmartRecruiters and Recruitee report the company's
+   name, which must match. Lever and Ashby don't, so they're only tried with
+   the whole name and rank lower.
+
+A board only counts if it has at least one open job: Workable keeps empty
+accounts under many big brand names ("IBM", "Deloitte"). Order of
+preference: a board linked from the company's own website; a board whose
+registered name matches; a board linked from a guessed `www.<name>.com`; a
+Lever/Ashby board with the exact name; a careers page on the company's site
+whose platform isn't recognised. The search stops early once nothing still
+running could beat what it has. Nothing is saved; the result fills the Add
+Jobs form for the user to check.
+
 ### Importing offices (`cmd/importplaces`)
 A command, not a route. Reads an `.osm.pbf` extract (e.g. OpenStreetMap
 France's `karnataka.osm.pbf`, which covers Bangalore), keeps named offices of the types

@@ -1,9 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addCompany, updateCompany } from '../store/companies/companiesThunks';
-import { setCompanyLocation } from '../services/nearbyService';
-import type { TrackPrefill } from '../services/nearbyService';
+import { findCareerPage, setCompanyLocation } from '../services/nearbyService';
+import type { CareerPageSuggestion, TrackPrefill } from '../services/nearbyService';
+import type { JobFilter } from '../types/filter';
+
+// OpenStreetMap often stores bare domains ("saifpartners.com"), which the
+// URL field would reject.
+function withScheme(url: string): string {
+  const u = url.trim();
+  return u && !u.includes('://') ? `https://${u}` : u;
+}
+
+function careerHint(finding: boolean, s: CareerPageSuggestion | null, failed: boolean): string {
+  if (finding) return "Looking for this company's career page…";
+  if (failed) return "Couldn't look up the career page. Paste the link to its jobs page.";
+  if (s?.found) return `Found automatically: ${s.how}. Check it's the right company before saving.`;
+  if (s?.career_url) return "No job board found, so this is the company's website or careers page. Check it, or paste the link to its jobs page.";
+  return "No career page found. Paste the link to the company's jobs page.";
+}
+
+function filterNote(f: JobFilter): string {
+  let note = 'Roles, locations and experience are filled from your Jobs around me filter';
+  if (f.experienceYears !== null) {
+    note += ` (Max Exp ${Math.floor(f.experienceYears)}: jobs asking for up to your ${Math.floor(f.experienceYears)} years)`;
+  }
+  note += '.';
+  if (f.interests.length > 0) note += " Areas of interest aren't a company filter, so they're left out.";
+  return note + ' Change anything before saving.';
+}
 
 export default function AddJobs() {
   const navigate = useNavigate();
@@ -11,6 +37,8 @@ export default function AddJobs() {
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((state) => state.companies);
   const token = useAppSelector((state) => state.auth.token);
+  // The Jobs around me filter, copied into the form when tracking from there.
+  const filter = useAppSelector((state) => state.filter.filter);
 
   // Check if an existing company was passed through router state for editing
   const existingCompany = location.state?.company || null;
@@ -25,6 +53,12 @@ export default function AddJobs() {
   const [roles, setRoles] = useState('');
   const [locations, setLocations] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  // Career page lookup for Track: null until it answers.
+  const [findingCareerPage, setFindingCareerPage] = useState(false);
+  const [careerSuggestion, setCareerSuggestion] = useState<CareerPageSuggestion | null>(null);
+  const [careerLookupFailed, setCareerLookupFailed] = useState(false);
+  // Once the user types a career URL, a late lookup result mustn't replace it.
+  const careerUrlTouched = useRef(false);
 
   // Pre-fill fields if we are editing an existing company
   useEffect(() => {
@@ -37,9 +71,39 @@ export default function AddJobs() {
       setLocations(existingCompany.locations ? existingCompany.locations.join(', ') : '');
     } else if (prefill) {
       setName(prefill.name);
-      setCareerUrl(prefill.career_url);
+      setCareerUrl(withScheme(prefill.career_url));
+      setRoles(filter.roles.join(', '));
+      setLocations(filter.locations.join(', '));
+      // The filter holds the user's own experience, so keep jobs that ask
+      // for at most that much.
+      setMinExp('');
+      setMaxExp(filter.experienceYears !== null ? String(Math.floor(filter.experienceYears)) : '');
     }
+    // filter is read once on arrival; later changes shouldn't overwrite edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, existingCompany, prefill]);
+
+  // Arriving from Track: look for the company's job board in the background.
+  useEffect(() => {
+    if (!prefill) return;
+    let cancelled = false;
+    setFindingCareerPage(true);
+    findCareerPage(token, prefill.name, prefill.career_url)
+      .then((s) => {
+        if (cancelled) return;
+        setCareerSuggestion(s);
+        if (s.career_url && !careerUrlTouched.current) setCareerUrl(s.career_url);
+      })
+      .catch(() => !cancelled && setCareerLookupFailed(true))
+      .finally(() => !cancelled && setFindingCareerPage(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [prefill, token]);
+
+  const filledFromFilter =
+    prefill !== null &&
+    (filter.roles.length > 0 || filter.locations.length > 0 || filter.experienceYears !== null);
 
   useEffect(() => {
     if (toast) {
@@ -156,9 +220,21 @@ export default function AddJobs() {
               className="ac-form-input"
               placeholder="https://jobs.mercedes-benz.com/"
               value={careerUrl}
-              onChange={(e) => setCareerUrl(e.target.value)}
+              onChange={(e) => {
+                careerUrlTouched.current = true;
+                setCareerUrl(e.target.value);
+              }}
             />
+            {prefill && (
+              <p className="ac-form-hint" aria-live="polite">
+                {careerHint(findingCareerPage, careerSuggestion, careerLookupFailed)}
+              </p>
+            )}
           </div>
+
+          {filledFromFilter && (
+            <p className="ac-form-hint ac-form-hint--note">{filterNote(filter)}</p>
+          )}
 
           <div className="ac-form-row">
             <div className="ac-form-group">

@@ -61,6 +61,7 @@ func main() {
 	mux.Handle("DELETE /companies/{id}", middleware.Auth(cfg.JWTSecret)(handlers.DeleteCompany(pool)))
 	mux.Handle("PUT /companies/{id}/location", middleware.Auth(cfg.JWTSecret)(handlers.SetCompanyLocation(pool, geocoder)))
 	mux.Handle("GET /nearby", middleware.Auth(cfg.JWTSecret)(handlers.Nearby(pool)))
+	mux.Handle("GET /career-page", middleware.Auth(cfg.JWTSecret)(handlers.FindCareerPage()))
 	mux.Handle("GET /nearby/places", middleware.Auth(cfg.JWTSecret)(handlers.NearbyPlaces(places)))
 	port := os.Getenv("PORT")
 	if port == "" {
