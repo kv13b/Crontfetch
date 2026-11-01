@@ -17,6 +17,10 @@ import (
 
 const earthRadiusKm = 6371.0
 
+// userAgent identifies CronFetch to the free OpenStreetMap services, as
+// their usage policies require.
+const userAgent = "CronFetch/0.1 (https://github.com/kv13b/Crontfetch)"
+
 // DistanceKm is the great-circle (haversine) distance between two points.
 func DistanceKm(lat1, lng1, lat2, lng2 float64) float64 {
 	rad := func(d float64) float64 { return d * math.Pi / 180 }
@@ -58,7 +62,7 @@ type Nominatim struct {
 func NewNominatim() *Nominatim {
 	return &Nominatim{
 		BaseURL:   "https://nominatim.openstreetmap.org",
-		UserAgent: "CronFetch/0.1 (https://github.com/kv13b/Crontfetch)",
+		UserAgent: userAgent,
 		Client:    &http.Client{Timeout: 10 * time.Second},
 	}
 }

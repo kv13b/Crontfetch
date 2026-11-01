@@ -341,8 +341,12 @@ radius, closest first: each is a `Company` object plus `distance_km`.
 ## `GET /nearby/places`
 
 Auth: required. Same query parameters as `/nearby`. Returns named offices
-from OpenStreetMap around the point, tracked or not, closest first. **Can
-take several seconds** on a cache miss; cached for 24 hours per ~1 km area.
+from OpenStreetMap around the point, tracked or not, closest first.
+
+Instant where the offices have been imported into the database
+(`cmd/importplaces`). Elsewhere it falls back to public map servers, which
+**can take up to a minute** on the first request for an area (then cached
+for 24 hours per ~5 km area). Show a loading state.
 
 **Success — `200`**
 ```json
@@ -355,18 +359,21 @@ take several seconds** on a cache miss; cached for 24 hours per ~1 km area.
     "address": "80 Feet Rd, Bengaluru",
     "lat": 12.9352,
     "lng": 77.6245,
-    "distance_km": 4.9
+    "distance_km": 4.9,
+    "source": "database"
   }
 ]
 ```
-`website` and `address` are `""` when OSM has no value.
+- `website` and `address` are `""` when OSM has no value.
+- `source` is where the list came from: `database`, `overpass` or `photon`.
+- `[]` if no source knows of any offices in the area.
 
 **Errors**
 | Status | Body | When |
 |---|---|---|
 | 400 | same as `/nearby` | |
 | 401 | `{"error":"missing or invalid authorization token"}` | |
-| 502 | `{"error":"map data service is busy, try again in a minute"}` | Overpass errored or timed out |
+| 502 | `{"error":"map data service is busy, try again in a minute"}` | nothing imported for this area and both public servers failed |
 
 ---
 

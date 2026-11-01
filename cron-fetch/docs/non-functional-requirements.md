@@ -23,8 +23,10 @@ For the full list of endpoints and exactly what each does, see
   numbered (no migration tool wired in yet).
 - **External services:** each supported career platform's own API (or, for
   TalentBrew, HTML scraping), the Telegram Bot API for notifications, and
-  two free OpenStreetMap services: Nominatim (address → coordinates) and
-  Overpass (offices near a point). No paid map or geocoding API is used.
+  free OpenStreetMap data: Nominatim (address → coordinates), a state
+  extract imported with `cmd/importplaces` (offices near a point), and the
+  public Overpass and Photon servers as fallbacks for areas not imported.
+  No paid map or geocoding API is used.
 - **Auth:** stateless JWTs (HS256), no server-side session store.
 
 ## Performance
@@ -47,10 +49,17 @@ For the full list of endpoints and exactly what each does, see
 
 - **Map lookups are rate-limited by design.** Nominatim allows one request
   per second, so the server queues address lookups and spaces them out.
-  Overpass queries run one at a time and are cached for 24 hours per ~1 km
-  grid cell; a cache miss can take several seconds, or time out when the
-  public server is busy. `/nearby` itself is fast: it only reads the
-  database and computes distances in memory.
+  `/nearby/places` reads imported offices from the database (indexed,
+  instant). Only areas not imported go to the public servers: one lookup
+  at a time, cached for 24 hours per ~5 km grid cell, and a server that
+  fails is skipped for 10 minutes. Those servers are often overloaded: in
+  testing, all four Overpass mirrors timed out for long stretches, and
+  Photon stopped answering after a burst of about 60 requests. That's why
+  the import comes first. `/nearby` is fast: it only reads the database
+  and computes distances in memory.
+- **The import is a full re-read of the extract.** Karnataka is about
+  130 MB and is read twice (nodes, then building outlines). Re-run it now
+  and then to pick up new offices; the extracts are updated daily.
 
 ## Reliability
 
@@ -92,8 +101,8 @@ For the full list of endpoints and exactly what each does, see
 - **The `jobs` table grows without bound.** Nothing prunes old job records,
   even for postings long since filled or removed. `jobs.last_seen_at` is now
   kept up to date, which is the basis for pruning later.
-- **The Overpass cache is in memory.** It's lost on restart and not shared
-  between instances.
+- **The public-server cache is in memory.** It's lost on restart and not
+  shared between instances. Imported offices are in Postgres and shared.
 - **No horizontal scaling story.** A single process serves the API and runs
   the sync loop; running more than one instance would sync (and notify)
   duplicately, since nothing coordinates between instances.

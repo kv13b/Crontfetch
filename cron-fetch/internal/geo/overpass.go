@@ -4,114 +4,107 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
+	"log/slog"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
-	"sync"
 	"time"
 )
 
-// officeTypes are the OpenStreetMap office=* values that are likely to be
+// OfficeTypes are the OpenStreetMap office=* values that are likely to be
 // employers worth showing on Jobs around me.
-const officeTypes = "company|it|software|telecommunication|engineering|consulting|research|financial|insurance|estate_agent|advertising_agency|logistics"
+var OfficeTypes = []string{"company", "it", "software", "telecommunication", "engineering", "consulting", "research", "financial"}
 
-// OSMPlace is a named office from OpenStreetMap.
-type OSMPlace struct {
-	ID         string  `json:"id"`
-	Name       string  `json:"name"`
-	Kind       string  `json:"kind"`
-	Website    string  `json:"website"`
-	Address    string  `json:"address"`
-	Lat        float64 `json:"lat"`
-	Lng        float64 `json:"lng"`
-	DistanceKm float64 `json:"distance_km"`
+// IsOffice reports whether an OSM element's tags describe a named office of
+// one of the OfficeTypes.
+func IsOffice(tags map[string]string) bool {
+	if strings.TrimSpace(tags["name"]) == "" {
+		return false
+	}
+	for _, t := range OfficeTypes {
+		if tags["office"] == t {
+			return true
+		}
+	}
+	return false
 }
 
-// Overpass finds offices near a point using the free Overpass API.
-// Results are cached per ~1 km grid cell for a day, and only one query runs
-// at a time, to stay well within the public server's fair-use limits.
+// PlaceFromTags builds an OSMPlace from an element's ID (e.g. "osm:way/2"),
+// tags and position.
+func PlaceFromTags(id string, tags map[string]string, lat, lng float64) OSMPlace {
+	return OSMPlace{
+		ID:      id,
+		Name:    strings.TrimSpace(tags["name"]),
+		Kind:    tags["office"],
+		Website: firstNonEmpty(tags["website"], tags["contact:website"], tags["url"]),
+		Address: osmAddress(tags),
+		Lat:     lat,
+		Lng:     lng,
+	}
+}
+
+// Overpass queries the free Overpass API. It returns the most complete list
+// when it's up, but the public servers are often overloaded, so several
+// mirrors are tried in turn (starting with whichever answered last), all
+// within Budget so a fallback source still has time to run.
 type Overpass struct {
-	BaseURL   string
-	UserAgent string
-	Client    *http.Client
-	TTL       time.Duration
+	Mirrors          []string
+	UserAgent        string
+	Client           *http.Client
+	PerMirrorTimeout time.Duration
+	Budget           time.Duration
 
-	queryMu sync.Mutex // one upstream query at a time
-
-	mu    sync.Mutex
-	cache map[string]overpassEntry
+	preferred int // index into Mirrors of the last one that worked; Places serialises calls
 }
 
-type overpassEntry struct {
-	places  []OSMPlace
-	fetched time.Time
-}
-
-// NewOverpass returns a client for the public overpass-api.de server.
+// NewOverpass returns a client for the public Overpass servers.
 func NewOverpass() *Overpass {
 	return &Overpass{
-		BaseURL:   "https://overpass-api.de/api/interpreter",
-		UserAgent: "CronFetch/0.1 (https://github.com/kv13b/Crontfetch)",
-		Client:    &http.Client{Timeout: 40 * time.Second},
-		TTL:       24 * time.Hour,
-		cache:     make(map[string]overpassEntry),
+		Mirrors: []string{
+			"https://overpass-api.de/api/interpreter",
+			"https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+			"https://overpass.private.coffee/api/interpreter",
+			"https://overpass.kumi.systems/api/interpreter",
+		},
+		UserAgent:        userAgent,
+		Client:           &http.Client{},
+		PerMirrorTimeout: 12 * time.Second,
+		Budget:           25 * time.Second,
 	}
 }
 
-// Offices returns named offices within radiusKm of lat/lng, closest first.
-func (o *Overpass) Offices(ctx context.Context, lat, lng, radiusKm float64) ([]OSMPlace, error) {
-	// Snap to a ~1 km grid so small moves reuse the cached result. Querying
-	// a slightly bigger radius around the cell centre covers the snap error.
-	cLat, cLng := math.Round(lat*100)/100, math.Round(lng*100)/100
-	key := fmt.Sprintf("%.2f,%.2f,%.0f", cLat, cLng, radiusKm)
+func (o *Overpass) Name() string { return "overpass" }
 
-	places, ok := o.cached(key)
-	if !ok {
-		o.queryMu.Lock()
-		// Another request may have filled the cache while this one waited.
-		if places, ok = o.cached(key); !ok {
-			var err error
-			places, err = o.query(ctx, cLat, cLng, radiusKm+1)
-			if err != nil {
-				o.queryMu.Unlock()
-				return nil, err
-			}
-			o.mu.Lock()
-			o.cache[key] = overpassEntry{places: places, fetched: time.Now()}
-			o.mu.Unlock()
+// Fetch tries each mirror in turn and remembers whichever answers.
+func (o *Overpass) Fetch(ctx context.Context, lat, lng, radiusKm float64) ([]OSMPlace, error) {
+	ctx, cancel := context.WithTimeout(ctx, o.Budget)
+	defer cancel()
+
+	var errs []string
+	for i := range o.Mirrors {
+		idx := (o.preferred + i) % len(o.Mirrors)
+		mctx, mcancel := context.WithTimeout(ctx, o.PerMirrorTimeout)
+		places, err := o.query(mctx, o.Mirrors[idx], lat, lng, radiusKm)
+		mcancel()
+		if err == nil {
+			o.preferred = idx
+			return places, nil
 		}
-		o.queryMu.Unlock()
-	}
-
-	out := make([]OSMPlace, 0, len(places))
-	for _, p := range places {
-		p.DistanceKm = DistanceKm(lat, lng, p.Lat, p.Lng)
-		if p.DistanceKm <= radiusKm {
-			out = append(out, p)
+		slog.Warn("overpass: mirror failed", "mirror", o.Mirrors[idx], "error", err)
+		errs = append(errs, err.Error())
+		if ctx.Err() != nil {
+			break
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].DistanceKm < out[j].DistanceKm })
-	return out, nil
+	return nil, fmt.Errorf("all mirrors failed: %s", strings.Join(errs, "; "))
 }
 
-func (o *Overpass) cached(key string) ([]OSMPlace, bool) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	e, ok := o.cache[key]
-	if !ok || time.Since(e.fetched) > o.TTL {
-		return nil, false
-	}
-	return e.places, true
-}
-
-func (o *Overpass) query(ctx context.Context, lat, lng, radiusKm float64) ([]OSMPlace, error) {
-	q := fmt.Sprintf(`[out:json][timeout:30];
+func (o *Overpass) query(ctx context.Context, endpoint string, lat, lng, radiusKm float64) ([]OSMPlace, error) {
+	q := fmt.Sprintf(`[out:json][timeout:20];
 nwr["office"~"^(%s)$"]["name"](around:%.0f,%f,%f);
-out center tags 500;`, officeTypes, radiusKm*1000, lat, lng)
+out center tags 2000;`, strings.Join(OfficeTypes, "|"), radiusKm*1000, lat, lng)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.BaseURL, strings.NewReader(url.Values{"data": {q}}.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(url.Values{"data": {q}}.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -120,11 +113,11 @@ out center tags 500;`, officeTypes, radiusKm*1000, lat, lng)
 
 	resp, err := o.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("overpass: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("overpass: status %d", resp.StatusCode)
+		return nil, fmt.Errorf("status %d", resp.StatusCode)
 	}
 
 	var body struct {
@@ -138,7 +131,7 @@ out center tags 500;`, officeTypes, radiusKm*1000, lat, lng)
 		} `json:"elements"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return nil, fmt.Errorf("overpass: decoding response: %w", err)
+		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
 	places := make([]OSMPlace, 0, len(body.Elements))
@@ -147,18 +140,7 @@ out center tags 500;`, officeTypes, radiusKm*1000, lat, lng)
 		if e.Center != nil { // ways and relations come back with a centre point
 			pLat, pLng = e.Center.Lat, e.Center.Lon
 		}
-		if pLat == 0 && pLng == 0 {
-			continue
-		}
-		places = append(places, OSMPlace{
-			ID:      fmt.Sprintf("osm:%s/%d", e.Type, e.ID),
-			Name:    e.Tags["name"],
-			Kind:    e.Tags["office"],
-			Website: firstNonEmpty(e.Tags["website"], e.Tags["contact:website"], e.Tags["url"]),
-			Address: osmAddress(e.Tags),
-			Lat:     pLat,
-			Lng:     pLng,
-		})
+		places = append(places, PlaceFromTags(fmt.Sprintf("osm:%s/%d", e.Type, e.ID), e.Tags, pLat, pLng))
 	}
 	return places, nil
 }
@@ -167,9 +149,13 @@ func osmAddress(tags map[string]string) string {
 	if full := tags["addr:full"]; full != "" {
 		return full
 	}
-	parts := []string{}
-	for _, k := range []string{"addr:housenumber", "addr:street", "addr:suburb", "addr:city"} {
-		if v := tags[k]; v != "" {
+	return joinNonEmpty(tags["addr:housenumber"], tags["addr:street"], tags["addr:suburb"], tags["addr:city"])
+}
+
+func joinNonEmpty(values ...string) string {
+	parts := make([]string, 0, len(values))
+	for _, v := range values {
+		if v != "" {
 			parts = append(parts, v)
 		}
 	}
