@@ -385,6 +385,27 @@
             "header": [],
             "url": "{{base_url}}/nearby/places?lat=12.9716&lng=77.5946&radius_km=10"
           }
+        },
+        {
+          "name": "GET /career-page (suggest a career page)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/career-page?name=Exponent%20Energy&website=",
+            "description": "Suggests a career page for a company before tracking it. Usually under a second, up to 20 s. Always 200; check `found`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has found and career_url\", () => { const j = pm.response.json(); pm.expect(j).to.have.property(\"found\"); pm.expect(j).to.have.property(\"career_url\"); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     }

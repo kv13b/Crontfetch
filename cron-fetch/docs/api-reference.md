@@ -375,6 +375,45 @@ for 24 hours per ~5 km area). Show a loading state.
 | 401 | `{"error":"missing or invalid authorization token"}` | |
 | 502 | `{"error":"map data service is busy, try again in a minute"}` | nothing imported for this area and both public servers failed |
 
+## `GET /career-page`
+
+Auth: required. Suggests a career page for a company the user is about to
+track (the Track button on Jobs around me). Nothing is saved.
+
+`GET /career-page?name=Exponent%20Energy&website=`
+
+- `name` (required, up to 200 characters): the company name.
+- `website` (optional): its website, if known. Bare domains like
+  `example.com` are accepted.
+
+Usually answers in under a second; **can take up to 20 seconds** when a
+company website is slow. Show a loading state.
+
+**Success — `200`** (always, even when nothing is found)
+```json
+{
+  "career_url": "https://apply.workable.com/exponent-energy/",
+  "platform": "workable",
+  "board": "exponent-energy",
+  "found": true,
+  "how": "Workable board \"exponent-energy\" (registered as \"Exponent Energy\")"
+}
+```
+- `found: true` means a job board CronFetch can read. `career_url` is then
+  that board's public page, which `POST /companies` recognises without
+  re-detecting the platform.
+- `found: false` with a `career_url`: the company's website or a careers
+  page on it; the job board wasn't recognised.
+- `found: false` with `career_url: ""`: nothing found.
+- `how` is a plain-English note to show the user, so they can judge whether
+  it's the right company.
+
+**Errors**
+| Status | Body | When |
+|---|---|---|
+| 400 | `{"error":"name is required (up to 200 characters)"}` | |
+| 401 | `{"error":"missing or invalid authorization token"}` | |
+
 ---
 
 ## `GET /health`

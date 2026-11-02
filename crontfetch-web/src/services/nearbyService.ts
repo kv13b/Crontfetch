@@ -48,3 +48,20 @@ export interface TrackPrefill {
   lat: number
   lng: number
 }
+
+// A suggested career page for a company, for the user to check before saving.
+export interface CareerPageSuggestion {
+  career_url: string
+  platform: string
+  board: string
+  // A job board CronFetch can read was found, not just a page.
+  found: boolean
+  // How it was found, in plain words.
+  how: string
+}
+
+export const findCareerPage = (token: string | null, name: string, website: string) =>
+  request<CareerPageSuggestion>(
+    `/career-page?name=${encodeURIComponent(name)}&website=${encodeURIComponent(website)}`,
+    { token },
+  )

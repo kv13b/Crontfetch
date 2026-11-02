@@ -60,6 +60,12 @@ For the full list of endpoints and exactly what each does, see
 - **The import is a full re-read of the extract.** Karnataka is about
   130 MB and is read twice (nodes, then building outlines). Re-run it now
   and then to pick up new offices; the extracts are updated daily.
+- **Career page lookups usually take under a second, at most 20.**
+  `GET /career-page` makes up to about 30 requests to job-board APIs (6 at a
+  time) plus a few to the company's website. It stops as soon as nothing
+  still running could beat what it has, so a name-verified board ends the
+  search early. A slow company website is what pushes it towards the
+  20-second limit. Results aren't cached; each Track click searches again.
 
 ## Reliability
 
@@ -81,7 +87,8 @@ For the full list of endpoints and exactly what each does, see
   simply logs in again).
 - **No rate limiting** on any endpoint, including `/signup` and `/login`.
 - **No SSRF protection.** The server fetches whatever URL a user supplies
-  (`career_url`, and for BeeSite the `board` API address) with no check
+  (`career_url`, for BeeSite the `board` API address, and the `website`
+  sent to `GET /career-page`) with no check
   against internal/private network addresses. This is an accepted gap for a
   single-user personal tool, but would need fixing (a dialer guard against
   private IP ranges) before this is exposed to untrusted users.

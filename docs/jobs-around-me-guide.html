@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jobs Around Me Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=JetBrains+Mono:wght@400;600&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column (68ch) with diagrams breaking out to ~1040px; layer colours match the map's own pins. */
+:root {
+  --bg: #f6f6fb;
+  --surface: #ffffff;
+  --fg: #17172a;
+  --fg-2: #45455e;
+  --muted: #5f5f78;
+  --line: #dcdce8;
+  --accent: #5b4cf0;      /* browser layer, and the "you" pin */
+  --accent-soft: #efedff;
+  --be: #0b7285;          /* Go API layer */
+  --be-soft: #e3f3f6;
+  --db: #a35f00;          /* Postgres */
+  --db-soft: #fdf0db;
+  --ext: #6b6f80;         /* public servers */
+  --ext-soft: #f0f1f5;
+  --pin-tracked: #15a34a;
+  --pin-osm: #8a8aa0;
+  --code-bg: #efeff7;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101019; --surface: #191926; --fg: #ececf5; --fg-2: #bdbdd2; --muted: #a2a2bb; --line: #34344b;
+    --accent: #9a90ff; --accent-soft: #24204a; --be: #56c2d6; --be-soft: #0f2c33;
+    --db: #e8a945; --db-soft: #2f240f; --ext: #a3a8b8; --ext-soft: #22232d;
+    --pin-tracked: #3cc872; --pin-osm: #9c9cb4; --code-bg: #1f1f2e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101019; --surface: #191926; --fg: #ececf5; --fg-2: #bdbdd2; --muted: #a2a2bb; --line: #34344b;
+  --accent: #9a90ff; --accent-soft: #24204a; --be: #56c2d6; --be-soft: #0f2c33;
+  --db: #e8a945; --db-soft: #2f240f; --ext: #a3a8b8; --ext-soft: #22232d;
+  --pin-tracked: #3cc872; --pin-osm: #9c9cb4; --code-bg: #1f1f2e;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.6;
+  padding-inline: 16px;
+  padding-block: 0 64px;
+}
+.wrap { max-width: 1040px; margin-inline: auto; }
+.prose { max-width: 68ch; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.6rem; font-weight: 700; }
+h3 { font-size: 1.1rem; font-weight: 600; }
+p { margin: 0; }
+code, .mono { font-family: var(--mono); font-size: 0.86em; }
+:not(pre) > code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Header */
+.hero { display: grid; gap: 18px; padding-block: 48px 28px; border-bottom: 1px solid var(--line); }
+.hero .lead { font-size: 1.15rem; color: var(--fg-2); max-width: 62ch; }
+.pins { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.pin { display: inline-flex; align-items: center; gap: 8px; font-size: 0.95rem; }
+.pin i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); flex: none; }
+.pin .you { background: var(--accent); }
+.pin .tracked { background: var(--pin-tracked); }
+.pin .osm { background: var(--pin-osm); width: 11px; height: 11px; }
+.status { font-size: 0.95rem; color: var(--muted); }
+
+/* Contents */
+.toc { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 18px; }
+.toc a {
+  font-size: 0.9rem; text-decoration: none; color: var(--fg-2);
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; background: var(--surface);
+}
+.toc a:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Sections */
+section { display: grid; gap: 16px; padding-block: 40px 8px; scroll-margin-top: 16px; }
+section > header { display: grid; gap: 6px; }
+
+/* Layer key */
+.key { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.92rem; color: var(--fg-2); }
+.key span { display: inline-flex; align-items: center; gap: 8px; }
+.sw { width: 22px; height: 14px; border-radius: 4px; border: 1.5px solid; flex: none; }
+.sw.fe { background: var(--accent-soft); border-color: var(--accent); }
+.sw.be { background: var(--be-soft); border-color: var(--be); }
+.sw.db { background: var(--db-soft); border-color: var(--db); }
+.sw.ext { background: var(--ext-soft); border-color: var(--ext); border-style: dashed; }
+
+/* Figures */
+figure { margin: 0; display: grid; gap: 10px; }
+.dg-wrap {
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+}
+svg.dg { display: block; width: 100%; min-width: 820px; height: auto; }
+figcaption { font-size: 0.95rem; color: var(--muted); max-width: 72ch; }
+
+.dg .grp-fe { fill: var(--accent-soft); stroke: var(--accent); stroke-opacity: 0.45; stroke-width: 1.2; }
+.dg .grp-be { fill: var(--be-soft); stroke: var(--be); stroke-opacity: 0.45; stroke-width: 1.2; }
+.dg .it { fill: var(--surface); stroke: var(--line); stroke-width: 1.3; }
+.dg .it-fe { stroke: var(--accent); }
+.dg .it-be { stroke: var(--be); }
+.dg .it-db { fill: var(--db-soft); stroke: var(--db); }
+.dg .it-ext { fill: var(--ext-soft); stroke: var(--ext); stroke-dasharray: 5 4; }
+.dg .it-q { stroke: var(--fg-2); }
+.dg .t { fill: var(--fg); font-family: var(--mono); font-size: 12.5px; }
+.dg .tb { font-weight: 600; }
+.dg .ts { fill: var(--muted); font-family: var(--body); font-size: 12px; }
+.dg .tl { fill: var(--fg-2); font-family: var(--body); font-size: 12px; }
+.dg .tk { fill: var(--muted); font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; }
+.dg .num { fill: var(--accent); font-weight: 600; }
+.dg .ar { fill: none; stroke: var(--fg-2); stroke-width: 1.4; }
+.dg .ar-ret { stroke-dasharray: 5 4; }
+.dg .ah { fill: var(--fg-2); }
+.dg .life { stroke: var(--line); stroke-width: 1.3; stroke-dasharray: 3 5; }
+.dg .sep { stroke: var(--line); stroke-width: 1.3; stroke-dasharray: 6 6; }
+
+.files { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 0.9rem; color: var(--muted); }
+.files code { background: var(--code-bg); border-radius: 6px; padding: 2px 8px; font-size: 0.82rem; color: var(--fg); }
+
+/* Glossary */
+.terms { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 0; }
+.terms div { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+.terms dt { font-family: var(--mono); font-size: 0.85rem; font-weight: 600; }
+.terms dd { margin: 4px 0 0; font-size: 0.95rem; color: var(--fg-2); }
+
+/* Schema cards */
+.schema { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.table-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; min-width: 0; }
+.table-card h3 { font-family: var(--mono); font-size: 0.95rem; padding: 10px 14px; background: var(--db-soft); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.table-card h3 small { font-weight: 400; color: var(--muted); }
+.table-card ul { list-style: none; margin: 0; padding: 8px 14px 12px; display: grid; gap: 4px; }
+.table-card li { display: flex; justify-content: space-between; gap: 12px; font-size: 0.92rem; flex-wrap: wrap; }
+.table-card li code { background: none; padding: 0; color: var(--fg); }
+.table-card li span { color: var(--muted); }
+.table-card li.new code::before { content: "+ "; color: var(--pin-tracked); font-weight: 600; }
+
+/* File map */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  font: inherit; font-size: 0.9rem; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg-2);
+  border-radius: 999px; padding: 4px 12px;
+}
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 0.93rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 400; }
+tr:last-child td { border-bottom: 0; }
+td.path code { background: none; padding: 0; white-space: nowrap; }
+td.path small { display: block; color: var(--muted); font-family: var(--mono); font-size: 0.72rem; }
+.layer { display: inline-block; font-size: 0.78rem; border-radius: 999px; padding: 1px 9px; border: 1px solid; white-space: nowrap; }
+.layer.fe { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.layer.be { color: var(--be); border-color: var(--be); background: var(--be-soft); }
+.layer.db { color: var(--db); border-color: var(--db); background: var(--db-soft); }
+.flows { color: var(--muted); font-size: 0.85rem; }
+.empty-row td { color: var(--muted); text-align: center; }
+
+/* Commands */
+.cmd { position: relative; }
+pre {
+  margin: 0; overflow-x: auto; background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 16px 18px; font-family: var(--mono); font-size: 0.84rem; line-height: 1.7;
+}
+pre .c { color: var(--muted); }
+.copy {
+  position: absolute; top: 10px; right: 10px; font: inherit; font-size: 0.8rem; cursor: pointer;
+  background: var(--surface); color: var(--fg-2); border: 1px solid var(--line); border-radius: 8px; padding: 3px 10px;
+}
+.gaps { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; max-width: 72ch; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .dg-wrap { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>body { margin: 0; } img { max-width: 100%; } [hidden] { display: none !important; }</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="eyebrow">CronFetch · dev branch · 31 Oct 2026</span>
+  <h1>Jobs Around Me Guide</h1>
+  <p class="lead">The <strong>Jobs around me</strong> page shows companies near you on a map. This guide follows each thing the page does from the click to the database, and names the file that does each step. Everything runs on free OpenStreetMap data, with no paid API keys.</p>
+  <div class="pins" aria-label="What the dots on the map mean">
+    <span class="pin"><i class="you"></i>You (browser location)</span>
+    <span class="pin"><i class="tracked"></i>Companies you track</span>
+    <span class="pin"><i class="osm"></i>Other offices from OpenStreetMap</span>
+  </div>
+  <p class="status">Status on 31 Oct 2026: the Karnataka import holds 1,838 offices. Around Panathur, <code>/nearby/places</code> returns 874 within 10 km in about 15 ms. All tests pass.</p>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <a href="#big-picture">Big picture</a>
+  <a href="#page-load">Opening the page</a>
+  <a href="#source-chain">Finding offices</a>
+  <a href="#office-location">Setting a location</a>
+  <a href="#track">Track this company</a>
+  <a href="#import">Importing offices</a>
+  <a href="#database">Database changes</a>
+  <a href="#files">File map</a>
+  <a href="#try">Try it</a>
+</nav>
+
+<!-- Big picture -->
+<section id="big-picture">
+  <header>
+    <span class="eyebrow">Start here</span>
+    <h2>The big picture</h2>
+  </header>
+  <p class="prose">Three layers talk to each other. The React app in the browser calls four routes on the Go API. The API reads and writes Postgres, and only reaches out to public servers when it has to. The colours below are used in every diagram on this page.</p>
+  <div class="key" aria-label="Colour key">
+    <span><i class="sw fe"></i>Browser (crontfetch-web)</span>
+    <span><i class="sw be"></i>Go API (cron-fetch)</span>
+    <span><i class="sw db"></i>Postgres</span>
+    <span><i class="sw ext"></i>Free public servers</span>
+  </div>
+  <figure>
+    <div class="dg-wrap">
+      <svg class="dg" viewBox="0 0 1000 512" role="img" aria-label="Architecture: the browser calls the Go API over HTTPS with a JWT; the API reads Postgres tables companies and osm_places, and uses Nominatim, Overpass and Photon only when needed; map tiles go straight from the browser to OpenStreetMap; an offline import fills osm_places.">
+        <defs>
+          <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+
+        <!-- map tiles -->
+        <rect class="it it-ext" x="720" y="20" width="260" height="44" rx="8"/>
+        <text class="t tb" x="736" y="38">tile.openstreetmap.org</text>
+        <text class="ts" x="736" y="55">public · map images</text>
+        <path class="ar" d="M135 96 V42 H718" marker-end="url(#ah1)"/>
+        <text class="tl" x="430" y="35" text-anchor="middle">NearbyMap.tsx loads map tiles straight from OpenStreetMap</text>
+
+        <!-- browser -->
+        <rect class="grp-fe" x="20" y="96" width="230" height="260" rx="12"/>
+        <text class="t tb" x="36" y="119">Browser <tspan class="ts">crontfetch-web</tspan></text>
+        <rect class="it it-fe" x="36" y="132" width="198" height="40" rx="8"/>
+        <text class="t tb" x="48" y="149">nearbyService.ts</text>
+        <text class="ts" x="48" y="164">calls the API</text>
+        <rect class="it it-fe" x="36" y="188" width="198" height="40" rx="8"/>
+        <text class="t tb" x="48" y="205">NearbyPage.tsx</text>
+        <text class="ts" x="48" y="220">the Jobs around me page</text>
+        <rect class="it it-fe" x="36" y="244" width="198" height="40" rx="8"/>
+        <text class="t tb" x="48" y="261">NearbyMap.tsx</text>
+        <text class="ts" x="48" y="276">Leaflet map and pins</text>
+        <rect class="it it-fe" x="36" y="300" width="198" height="40" rx="8"/>
+        <text class="t tb" x="48" y="317">AddJobs.tsx</text>
+        <text class="ts" x="48" y="332">Track → add the company</text>
+        <path class="ar" d="M36 320 H28 V152 H35" marker-end="url(#ah1)"/>
+        <path class="ar" d="M36 208 H28"/>
+
+        <!-- browser <-> api -->
+        <path class="ar" d="M234 146 H334" marker-end="url(#ah1)"/>
+        <text class="tl" x="285" y="139" text-anchor="middle">HTTPS + JWT</text>
+        <path class="ar ar-ret" d="M336 160 H236" marker-end="url(#ah1)"/>
+        <text class="tl" x="285" y="177" text-anchor="middle">JSON</text>
+
+        <!-- api -->
+        <rect class="grp-be" x="320" y="96" width="270" height="260" rx="12"/>
+        <text class="t tb" x="336" y="119">Go API <tspan class="ts">cron-fetch</tspan></text>
+        <rect class="it it-be" x="336" y="132" width="238" height="40" rx="8"/>
+        <text class="t tb" x="348" y="149">middleware.Auth</text>
+        <text class="ts" x="348" y="164">checks the JWT on every route</text>
+        <rect class="it it-be" x="336" y="188" width="238" height="40" rx="8"/>
+        <text class="t tb" x="348" y="205">handlers/location.go</text>
+        <text class="ts" x="348" y="220">the three routes</text>
+        <rect class="it it-be" x="336" y="244" width="238" height="40" rx="8"/>
+        <text class="t tb" x="348" y="261">geo/geo.go</text>
+        <text class="ts" x="348" y="276">distance maths, Nominatim client</text>
+        <rect class="it it-be" x="336" y="300" width="238" height="40" rx="8"/>
+        <text class="t tb" x="348" y="317">geo/places.go</text>
+        <text class="ts" x="348" y="332">db.go · overpass.go · photon.go</text>
+        <path class="ar" d="M455 172 V186" marker-end="url(#ah1)"/>
+        <path class="ar" d="M336 214 H328 V320 H335" marker-end="url(#ah1)"/>
+        <path class="ar" d="M328 264 H335" marker-end="url(#ah1)"/>
+
+        <!-- right column -->
+        <rect class="it it-db" x="720" y="188" width="260" height="40" rx="8"/>
+        <text class="t tb" x="736" y="205">companies</text>
+        <text class="ts" x="736" y="220">Postgres · now has office_address, lat, lng</text>
+        <rect class="it it-ext" x="720" y="244" width="260" height="40" rx="8"/>
+        <text class="t tb" x="736" y="261">Nominatim</text>
+        <text class="ts" x="736" y="276">public · address → lat/lng</text>
+        <rect class="it it-ext" x="720" y="300" width="260" height="40" rx="8"/>
+        <text class="t tb" x="736" y="317">Overpass → Photon</text>
+        <text class="ts" x="736" y="332">public · only if nothing is imported</text>
+        <rect class="it it-db" x="720" y="356" width="260" height="40" rx="8"/>
+        <text class="t tb" x="736" y="373">osm_places</text>
+        <text class="ts" x="736" y="388">Postgres · offices from the import</text>
+
+        <path class="ar" d="M574 208 H718" marker-end="url(#ah1)"/>
+        <text class="tl" x="646" y="201" text-anchor="middle">reads / writes</text>
+        <path class="ar" d="M574 264 H718" marker-end="url(#ah1)"/>
+        <text class="tl" x="646" y="257" text-anchor="middle">looks up an address</text>
+        <path class="ar" d="M574 320 H718" marker-end="url(#ah1)"/>
+        <text class="tl" x="646" y="313" text-anchor="middle">2nd: if no rows</text>
+        <path class="ar" d="M500 340 V376 H718" marker-end="url(#ah1)"/>
+        <text class="tl" x="610" y="369" text-anchor="middle">1st: offices in the area</text>
+
+        <!-- offline -->
+        <line class="sep" x1="20" y1="420" x2="980" y2="420"/>
+        <text class="tk" x="20" y="442">OFFLINE · RUN BY HAND</text>
+        <rect class="it" x="20" y="456" width="230" height="40" rx="8"/>
+        <text class="t tb" x="32" y="473">karnataka.osm.pbf</text>
+        <text class="ts" x="32" y="488">~130 MB download</text>
+        <path class="ar" d="M250 476 H318" marker-end="url(#ah1)"/>
+        <text class="tl" x="285" y="469" text-anchor="middle">reads twice</text>
+        <rect class="it it-be" x="320" y="456" width="270" height="40" rx="8"/>
+        <text class="t tb" x="336" y="473">cmd/importplaces</text>
+        <text class="ts" x="336" y="488">keeps named offices only</text>
+        <path class="ar" d="M590 476 H850 V398" marker-end="url(#ah1)"/>
+        <text class="tl" x="720" y="469" text-anchor="middle">replaces all rows</text>
+      </svg>
+    </div>
+    <figcaption>The browser only ever talks to our API, except for map images, which Leaflet fetches straight from OpenStreetMap. The API tries its own database before any public server. The import runs by hand, not on every request.</figcaption>
+  </figure>
+  <dl class="terms">
+    <div><dt>OpenStreetMap (OSM)</dt><dd>A free, volunteer-made world map. Every place on it has tags, like <code>office=it</code> and <code>name=Cisco</code>.</dd></div>
+    <div><dt>Nominatim</dt><dd>OSM's free address search. Turns "Koramangala, Bengaluru" into coordinates. Allows one request per second.</dd></div>
+    <div><dt>Overpass, Photon</dt><dd>Free public servers that answer "what is near this point?" over OSM data. Often overloaded, so they're our fallback.</dd></div>
+    <div><dt>.osm.pbf</dt><dd>A compressed download of OSM data for a region. We read it once and keep the offices.</dd></div>
+    <div><dt>Haversine</dt><dd>The formula for straight-line distance on a sphere. <code>geo.DistanceKm</code>.</dd></div>
+    <div><dt>Bounding box</dt><dd>A lat/lng rectangle around a point. Cheap to query with an index, then trimmed to a true circle.</dd></div>
+  </dl>
+</section>
+
+<!-- Page load -->
+<section id="page-load">
+  <header>
+    <span class="eyebrow">Flow · opening the page</span>
+    <h2>What happens when you open Jobs around me</h2>
+  </header>
+  <p class="prose">The page asks the browser where you are, then makes three API calls. The numbers are the order things start in.</p>
+  <figure>
+    <div class="dg-wrap">
+      <svg class="dg" viewBox="0 0 1000 600" role="img" aria-label="Sequence: the page gets your position from the browser, loads your companies, asks /nearby for tracked companies within 10 km (green pins), asks /nearby/places for other offices (grey pins), then draws the map.">
+        <defs>
+          <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+        <!-- lane headers -->
+        <rect class="it it-fe" x="10" y="16" width="160" height="44" rx="8"/>
+        <text class="t tb" x="90" y="35" text-anchor="middle">Browser GPS</text>
+        <text class="ts" x="90" y="51" text-anchor="middle">navigator.geolocation</text>
+        <rect class="it it-fe" x="200" y="16" width="160" height="44" rx="8"/>
+        <text class="t tb" x="280" y="35" text-anchor="middle">NearbyPage.tsx</text>
+        <text class="ts" x="280" y="51" text-anchor="middle">the page</text>
+        <rect class="it it-be" x="420" y="16" width="160" height="44" rx="8"/>
+        <text class="t tb" x="500" y="35" text-anchor="middle">Go API</text>
+        <text class="ts" x="500" y="51" text-anchor="middle">handlers/location.go</text>
+        <rect class="it it-db" x="640" y="16" width="160" height="44" rx="8"/>
+        <text class="t tb" x="720" y="35" text-anchor="middle">Postgres</text>
+        <text class="ts" x="720" y="51" text-anchor="middle">companies · osm_places</text>
+        <rect class="it it-ext" x="820" y="16" width="160" height="44" rx="8"/>
+        <text class="t tb" x="900" y="35" text-anchor="middle">Public servers</text>
+        <text class="ts" x="900" y="51" text-anchor="middle">Overpass · Photon</text>
+        <!-- lifelines -->
+        <line class="life" x1="90" y1="60" x2="90" y2="590"/>
+        <line class="life" x1="280" y1="60" x2="280" y2="590"/>
+        <line class="life" x1="500" y1="60" x2="500" y2="590"/>
+        <line class="life" x1="720" y1="60" x2="720" y2="590"/>
+        <line class="life" x1="900" y1="60" x2="900" y2="590"/>
+
+        <!-- 1 location -->
+        <path class="ar" d="M280 100 H92" marker-end="url(#ah2)"/>
+        <text class="tl" x="185" y="93" text-anchor="middle"><tspan class="num">1</tspan>  where am I?</text>
+        <path class="ar ar-ret" d="M90 132 H278" marker-end="url(#ah2)"/>
+        <text class="tl" x="185" y="125" text-anchor="middle">lat, lng · blocked → Bangalore</text>
+
+        <!-- 2 companies -->
+        <path class="ar" d="M280 178 H498" marker-end="url(#ah2)"/>
+        <text class="tl" x="390" y="171" text-anchor="middle"><tspan class="num">2</tspan>  GET /companies</text>
+        <path class="ar" d="M500 204 H718" marker-end="url(#ah2)"/>
+        <text class="tl" x="610" y="197" text-anchor="middle">your companies</text>
+        <path class="ar ar-ret" d="M500 232 H282" marker-end="url(#ah2)"/>
+        <text class="tl" x="390" y="225" text-anchor="middle">list, for Office locations</text>
+
+        <!-- 3 nearby -->
+        <path class="ar" d="M280 280 H498" marker-end="url(#ah2)"/>
+        <text class="tl" x="390" y="273" text-anchor="middle"><tspan class="num">3</tspan>  GET /nearby?lat&amp;lng</text>
+        <path class="ar" d="M500 306 H718" marker-end="url(#ah2)"/>
+        <text class="tl" x="610" y="299" text-anchor="middle">your companies with lat/lng</text>
+        <rect class="it it-be" x="420" y="322" width="160" height="34" rx="8"/>
+        <text class="t" x="500" y="343" text-anchor="middle">filterNearby ≤ 10 km</text>
+        <path class="ar ar-ret" d="M500 382 H282" marker-end="url(#ah2)"/>
+        <text class="tl" x="390" y="375" text-anchor="middle">green pins, closest first</text>
+
+        <!-- 4 places -->
+        <path class="ar" d="M280 428 H498" marker-end="url(#ah2)"/>
+        <text class="tl" x="390" y="421" text-anchor="middle"><tspan class="num">4</tspan>  GET /nearby/places</text>
+        <path class="ar" d="M500 454 H718" marker-end="url(#ah2)"/>
+        <text class="tl" x="610" y="447" text-anchor="middle">osm_places in the area</text>
+        <path class="ar ar-ret" d="M500 488 H898" marker-end="url(#ah2)"/>
+        <text class="tl" x="810" y="481" text-anchor="middle">only if nothing imported</text>
+        <path class="ar ar-ret" d="M500 524 H282" marker-end="url(#ah2)"/>
+        <text class="tl" x="390" y="517" text-anchor="middle">grey pins, with source</text>
+
+        <!-- 5 draw -->
+        <rect class="it it-fe" x="170" y="548" width="220" height="34" rx="8"/>
+        <text class="t" x="280" y="569" text-anchor="middle"><tspan class="num">5</tspan>  NearbyMap.tsx draws it</text>
+      </svg>
+    </div>
+    <figcaption>Steps 1 and 2 start together when the page opens. Steps 3 and 4 run at the same time once the position is known. Step 4 has its own loading state, so a slow lookup never holds up the green pins. Grey offices whose name matches a tracked company are hidden, since they already show as green.</figcaption>
+  </figure>
+  <div class="files">Files: <code>NearbyPage.tsx</code><code>nearbyService.ts</code><code>NearbyMap.tsx</code><code>handlers/location.go</code><code>geo/geo.go</code></div>
+</section>
+
+<!-- Source chain -->
+<section id="source-chain">
+  <header>
+    <span class="eyebrow">Flow · finding offices</span>
+    <h2>How <code>/nearby/places</code> finds offices</h2>
+  </header>
+  <p class="prose">This is the part with the most logic. <code>Places.Offices</code> in <code>geo/places.go</code> asks up to three sources in turn and takes the first one that answers. Each source is a small type with the same two methods, <code>Name()</code> and <code>Fetch()</code>, so adding a fourth is one new file.</p>
+  <figure>
+    <div class="dg-wrap">
+      <svg class="dg" viewBox="0 0 1000 372" role="img" aria-label="Flowchart: the request is snapped to a 5 km grid cell; if a public-server result is cached it is used; otherwise the database is tried, then Overpass, then Photon; the first success is kept, filtered to the radius and sorted by distance.">
+        <defs>
+          <marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+        <!-- row A -->
+        <rect class="it it-be" x="20" y="20" width="280" height="44" rx="8"/>
+        <text class="t tb" x="34" y="38">handlers.NearbyPlaces</text>
+        <text class="ts" x="34" y="55">reads lat, lng, radius_km (≤ 50)</text>
+        <path class="ar" d="M300 42 H358" marker-end="url(#ah3)"/>
+        <rect class="it it-be" x="360" y="20" width="260" height="44" rx="8"/>
+        <text class="t tb" x="374" y="38">Snap to a ~5 km grid cell</text>
+        <text class="ts" x="374" y="55">nearby requests share one result</text>
+        <path class="ar" d="M620 42 H678" marker-end="url(#ah3)"/>
+        <rect class="it it-q" x="680" y="20" width="260" height="44" rx="22"/>
+        <text class="t tb" x="810" y="38" text-anchor="middle">Cached in the last 24 h?</text>
+        <text class="ts" x="810" y="55" text-anchor="middle">public-server results only</text>
+
+        <!-- yes path -->
+        <path class="ar" d="M940 42 H970 V270 H640 V298" marker-end="url(#ah3)"/>
+        <text class="tl" x="955" y="34" text-anchor="middle">yes</text>
+        <!-- no path -->
+        <path class="ar" d="M780 64 V100 H140 V148" marker-end="url(#ah3)"/>
+        <text class="tl" x="790" y="86">no</text>
+        <text class="tk" x="152" y="128">TRY EACH SOURCE IN ORDER</text>
+
+        <!-- row B -->
+        <rect class="it it-db" x="20" y="150" width="240" height="64" rx="8"/>
+        <text class="t tb" x="34" y="170"><tspan class="num">1</tspan>  DBSource</text>
+        <text class="ts" x="34" y="187">db.go · reads osm_places</text>
+        <text class="ts" x="34" y="203">instant, never cached</text>
+        <path class="ar" d="M260 182 H358" marker-end="url(#ah3)"/>
+        <text class="tl" x="310" y="175" text-anchor="middle">no rows here</text>
+        <rect class="it it-ext" x="360" y="150" width="240" height="64" rx="8"/>
+        <text class="t tb" x="374" y="170"><tspan class="num">2</tspan>  Overpass</text>
+        <text class="ts" x="374" y="187">overpass.go · 4 mirrors in turn</text>
+        <text class="ts" x="374" y="203">25 s budget in total</text>
+        <path class="ar" d="M600 182 H698" marker-end="url(#ah3)"/>
+        <text class="tl" x="650" y="163" text-anchor="middle">all mirrors</text>
+        <text class="tl" x="650" y="176" text-anchor="middle">failed</text>
+        <rect class="it it-ext" x="700" y="150" width="240" height="64" rx="8"/>
+        <text class="t tb" x="714" y="170"><tspan class="num">3</tspan>  Photon</text>
+        <text class="ts" x="714" y="187">photon.go · 50 nearest + 18 words</text>
+        <text class="ts" x="714" y="203">stops if the nearest lookup fails</text>
+        <path class="ar" d="M880 150 V120" marker-end="url(#ah3)"/>
+        <text class="tl" x="880" y="113" text-anchor="middle">nothing worked → 502</text>
+
+        <!-- success bus -->
+        <path class="ar" d="M140 214 V298" marker-end="url(#ah3)"/>
+        <path class="ar" d="M480 214 V250 H140"/>
+        <path class="ar" d="M820 214 V250 H480"/>
+        <text class="tl" x="310" y="244" text-anchor="middle">returns offices</text>
+
+        <!-- row C -->
+        <rect class="it it-be" x="20" y="300" width="400" height="52" rx="8"/>
+        <text class="t tb" x="34" y="321">Keep the first source that answers</text>
+        <text class="ts" x="34" y="339">tag it with its name, drop duplicates, cache it</text>
+        <path class="ar" d="M420 326 H498" marker-end="url(#ah3)"/>
+        <rect class="it it-be" x="500" y="300" width="260" height="52" rx="8"/>
+        <text class="t tb" x="514" y="321">Keep offices in the radius</text>
+        <text class="ts" x="514" y="339">distance from you, closest first</text>
+        <path class="ar" d="M760 326 H798" marker-end="url(#ah3)"/>
+        <rect class="it it-fe" x="800" y="300" width="140" height="52" rx="8"/>
+        <text class="t tb" x="814" y="321">JSON</text>
+        <text class="ts" x="814" y="339">grey pins</text>
+      </svg>
+    </div>
+    <figcaption>A source that fails (a timeout, a 504) is skipped for 10 minutes, so a dead server doesn't slow every request down. "No rows here" from the database isn't a failure, so the database is never skipped. The cache is only for the public servers; the database is fast enough to ask every time.</figcaption>
+  </figure>
+  <div class="files">Files: <code>geo/places.go</code><code>geo/db.go</code><code>geo/overpass.go</code><code>geo/photon.go</code><code>handlers/location.go</code><code>cmd/api/main.go</code> (sets the order)</div>
+</section>
+
+<!-- Office location -->
+<section id="office-location">
+  <header>
+    <span class="eyebrow">Flow · setting a location</span>
+    <h2>Giving a tracked company an office location</h2>
+  </header>
+  <p class="prose">A tracked company only gets a green pin once it has coordinates. The <strong>Office locations</strong> section on the page has two ways to set them, and both call the same route.</p>
+  <figure>
+    <div class="dg-wrap">
+      <svg class="dg" viewBox="0 0 1000 236" role="img" aria-label="Flow: Find address sends an address and Pick on map sends coordinates to PUT /companies/{id}/location; coordinates are saved directly, an address is looked up with Nominatim first; not found returns 400.">
+        <defs>
+          <marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+        <rect class="it it-fe" x="20" y="20" width="230" height="44" rx="8"/>
+        <text class="t tb" x="34" y="38">Find address</text>
+        <text class="ts" x="34" y="55">sends office_address</text>
+        <rect class="it it-fe" x="20" y="110" width="230" height="44" rx="8"/>
+        <text class="t tb" x="34" y="128">Pick on map</text>
+        <text class="ts" x="34" y="145">click the map · sends lat, lng</text>
+        <path class="ar" d="M250 42 H285 V80 H318" marker-end="url(#ah4)"/>
+        <path class="ar" d="M250 132 H285 V94 H318" marker-end="url(#ah4)"/>
+
+        <rect class="it it-be" x="320" y="65" width="250" height="44" rx="8"/>
+        <text class="t tb" x="334" y="83">PUT /companies/{id}/location</text>
+        <text class="ts" x="334" y="100">handlers.SetCompanyLocation</text>
+        <path class="ar" d="M570 87 H628" marker-end="url(#ah4)"/>
+
+        <rect class="it it-q" x="630" y="65" width="170" height="44" rx="22"/>
+        <text class="t tb" x="715" y="83" text-anchor="middle">lat/lng sent?</text>
+        <text class="ts" x="715" y="100" text-anchor="middle">both, or neither</text>
+        <path class="ar" d="M800 87 H848" marker-end="url(#ah4)"/>
+        <text class="tl" x="824" y="80" text-anchor="middle">yes</text>
+
+        <rect class="it it-db" x="850" y="65" width="130" height="44" rx="8"/>
+        <text class="t tb" x="864" y="83">companies</text>
+        <text class="ts" x="864" y="100">UPDATE the row</text>
+
+        <path class="ar" d="M715 109 V168" marker-end="url(#ah4)"/>
+        <text class="tl" x="723" y="143">no, address only</text>
+        <rect class="it it-ext" x="630" y="170" width="170" height="44" rx="8"/>
+        <text class="t tb" x="644" y="188">Nominatim</text>
+        <text class="ts" x="644" y="205">geo.go · 1 request/s</text>
+        <path class="ar" d="M800 192 H915 V111" marker-end="url(#ah4)"/>
+        <text class="tl" x="850" y="185" text-anchor="middle">found</text>
+        <path class="ar" d="M630 192 H572" marker-end="url(#ah4)"/>
+        <text class="tl" x="601" y="185" text-anchor="middle">not found</text>
+        <rect class="it" x="320" y="170" width="250" height="44" rx="8"/>
+        <text class="t tb" x="334" y="188">400</text>
+        <text class="ts" x="334" y="205">"couldn't find that address…"</text>
+      </svg>
+    </div>
+    <figcaption>Coordinates you send are saved as they are. An address is looked up with Nominatim first; geo.go queues lookups so we never send more than one per second. The saved row gets <code>office_address</code>, <code>lat</code>, <code>lng</code>, <code>place_id</code> and <code>geocoded_at</code>. Sending neither clears the location.</figcaption>
+  </figure>
+  <div class="files">Files: <code>NearbyPage.tsx</code> (OfficeLocationRow)<code>NearbyMap.tsx</code> (ClickToPick)<code>handlers/location.go</code><code>geo/geo.go</code></div>
+</section>
+
+<!-- Track -->
+<section id="track">
+  <header>
+    <span class="eyebrow">Flow · track this company</span>
+    <h2>Turning a grey pin into a green one</h2>
+  </header>
+  <p class="prose">Grey offices come from OpenStreetMap and have no career page attached, so CronFetch can't check them for jobs. <strong>Track this company</strong> moves one into your tracked list in five steps.</p>
+  <figure>
+    <div class="dg-wrap">
+      <svg class="dg" viewBox="0 0 1000 136" role="img" aria-label="Five steps: click Track this company, Add Jobs opens and looks up the career page, you check the career URL and the filters copied from Jobs around me and save, the app creates the company and saves its location, and it returns to the map as a green pin.">
+        <defs>
+          <marker id="ah5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+        <rect class="it it-fe" x="20" y="20" width="170" height="96" rx="8"/>
+        <text class="t tb" x="34" y="44"><tspan class="num">1</tspan>  Track</text>
+        <text class="ts" x="34" y="66">grey pin popup, or the</text>
+        <text class="ts" x="34" y="83">Companies around you</text>
+        <text class="ts" x="34" y="100">list on NearbyPage</text>
+        <path class="ar" d="M190 68 H213" marker-end="url(#ah5)"/>
+        <rect class="it it-fe" x="215" y="20" width="170" height="96" rx="8"/>
+        <text class="t tb" x="229" y="44"><tspan class="num">2</tspan>  Open Add Jobs</text>
+        <text class="ts" x="229" y="66">name filled in; starts</text>
+        <text class="ts" x="229" y="83">the career page lookup</text>
+        <text class="ts" x="229" y="100">(GET /career-page)</text>
+        <path class="ar" d="M385 68 H408" marker-end="url(#ah5)"/>
+        <rect class="it it-fe" x="410" y="20" width="170" height="96" rx="8"/>
+        <text class="t tb" x="424" y="44"><tspan class="num">3</tspan>  Check, save</text>
+        <text class="ts" x="424" y="66">career URL found for you;</text>
+        <text class="ts" x="424" y="83">roles, locations, exp.</text>
+        <text class="ts" x="424" y="100">copied from your filter</text>
+        <path class="ar" d="M580 68 H603" marker-end="url(#ah5)"/>
+        <rect class="it it-be" x="605" y="20" width="170" height="96" rx="8"/>
+        <text class="t tb" x="619" y="44"><tspan class="num">4</tspan>  Two API calls</text>
+        <text class="ts" x="619" y="66">POST /companies, then</text>
+        <text class="ts" x="619" y="83">PUT …/location with</text>
+        <text class="ts" x="619" y="100">the map position</text>
+        <path class="ar" d="M775 68 H798" marker-end="url(#ah5)"/>
+        <rect class="it it-fe" x="800" y="20" width="170" height="96" rx="8"/>
+        <text class="t tb" x="814" y="44"><tspan class="num">5</tspan>  Back on the map</text>
+        <text class="ts" x="814" y="66">a green pin appears;</text>
+        <text class="ts" x="814" y="83">its grey pin is hidden</text>
+        <text class="ts" x="814" y="100">(same name)</text>
+      </svg>
+    </div>
+    <figcaption>The career page fills in a second or so after Add Jobs opens; if you type a URL first, yours is kept. Max Exp is set to your own years from the filter, so jobs asking for more are left out. Areas of interest aren't a company filter, so they aren't copied. If saving the location in step 4 fails, the company is still added. If you rename the company in step 3, both pins will show.</figcaption>
+  </figure>
+
+  <h3>How the career page is found</h3>
+  <p class="prose">OpenStreetMap rarely knows a company's career page, so <code>fetcher.FindCareerPage</code> runs two searches at once and keeps the best evidence.</p>
+  <figure>
+    <div class="dg-wrap">
+      <svg class="dg" viewBox="0 0 1000 250" role="img" aria-label="GET /career-page searches the company's website and asks the job boards by name at the same time; the best evidence wins, with boards linked from the company's own site first and boards with no open jobs ignored.">
+        <defs>
+          <marker id="ah7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+        <rect class="it it-be" x="20" y="100" width="200" height="50" rx="8"/>
+        <text class="t tb" x="34" y="121">GET /career-page</text>
+        <text class="ts" x="34" y="139">name, website (optional)</text>
+        <path class="ar" d="M220 118 H255 V60 H288" marker-end="url(#ah7)"/>
+        <path class="ar" d="M220 132 H255 V190 H288" marker-end="url(#ah7)"/>
+
+        <rect class="it it-be" x="290" y="20" width="360" height="80" rx="8"/>
+        <text class="t tb" x="304" y="44">Search the company's website</text>
+        <text class="ts" x="304" y="66">the website OSM has, else a guess: www.&lt;name&gt;.com</text>
+        <text class="ts" x="304" y="84">home page, then /careers, /jobs, /career, /join-us</text>
+        <rect class="it it-ext" x="290" y="150" width="360" height="80" rx="8"/>
+        <text class="t tb" x="304" y="174">Ask the job boards by name</text>
+        <text class="ts" x="304" y="196">Greenhouse, Workable, SmartRecruiters, Recruitee:</text>
+        <text class="ts" x="304" y="214">name must match · Lever, Ashby: exact name only</text>
+
+        <path class="ar" d="M650 60 H718" marker-end="url(#ah7)"/>
+        <path class="ar" d="M650 190 H718" marker-end="url(#ah7)"/>
+        <text class="tl" x="684" y="53" text-anchor="middle">links found</text>
+        <text class="tl" x="684" y="183" text-anchor="middle">boards found</text>
+
+        <rect class="it it-q" x="720" y="20" width="260" height="210" rx="14"/>
+        <text class="t tb" x="736" y="44">Best evidence wins</text>
+        <text class="ts" x="736" y="72"><tspan class="num">1</tspan>  board linked from its own site</text>
+        <text class="ts" x="736" y="96"><tspan class="num">2</tspan>  board whose name matches</text>
+        <text class="ts" x="736" y="120"><tspan class="num">3</tspan>  board linked from www.&lt;name&gt;.com</text>
+        <text class="ts" x="736" y="144"><tspan class="num">4</tspan>  Lever/Ashby with the exact name</text>
+        <text class="ts" x="736" y="168"><tspan class="num">5</tspan>  careers page, platform unknown</text>
+        <text class="tk" x="736" y="206">BOARDS NEED ≥ 1 OPEN JOB</text>
+      </svg>
+    </div>
+    <figcaption>A board only counts if it has open jobs: Workable keeps empty accounts under big names like "IBM" and "Deloitte". The search stops as soon as nothing still running could do better, so most answers take under a second. On 25 random offices near Panathur it found a readable job board for 10, a website or careers page for 5, and nothing for 10 (mostly big firms on their own career systems).</figcaption>
+  </figure>
+  <div class="files">Files: <code>NearbyMap.tsx</code><code>NearbyPage.tsx</code> (track)<code>AddJobs.tsx</code><code>nearbyService.ts</code> (findCareerPage, TrackPrefill)<code>fetcher/careerpage.go</code><code>handlers/careerpage.go</code></div>
+</section>
+
+<!-- Import -->
+<section id="import">
+  <header>
+    <span class="eyebrow">Flow · importing offices</span>
+    <h2>Filling <code>osm_places</code> from a download</h2>
+  </header>
+  <p class="prose">The public map servers were too unreliable to call on every page load: in testing, all four Overpass mirrors timed out for long stretches, and Photon stopped answering after about 60 requests. So we download the map data once and keep the offices in our own table. The Karnataka import takes about 2 seconds and saves 1,838 offices.</p>
+  <figure>
+    <div class="dg-wrap">
+      <svg class="dg" viewBox="0 0 1000 136" role="img" aria-label="Import pipeline: read the pbf file, pass 1 keeps office nodes and office outlines with their corner IDs, pass 2 reads those corners' coordinates, outlines are placed at their centre, then one transaction replaces osm_places.">
+        <defs>
+          <marker id="ah6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+        <rect class="it" x="20" y="20" width="170" height="96" rx="8"/>
+        <text class="t tb" x="34" y="44">karnataka.osm.pbf</text>
+        <text class="ts" x="34" y="66">~130 MB from</text>
+        <text class="ts" x="34" y="83">openstreetmap.fr,</text>
+        <text class="ts" x="34" y="100">updated daily</text>
+        <path class="ar" d="M190 68 H213" marker-end="url(#ah6)"/>
+        <rect class="it it-be" x="215" y="20" width="170" height="96" rx="8"/>
+        <text class="t tb" x="229" y="44">Pass 1</text>
+        <text class="ts" x="229" y="66">keep office points;</text>
+        <text class="ts" x="229" y="83">keep office outlines and</text>
+        <text class="ts" x="229" y="100">note their corner IDs</text>
+        <path class="ar" d="M385 68 H408" marker-end="url(#ah6)"/>
+        <rect class="it it-be" x="410" y="20" width="170" height="96" rx="8"/>
+        <text class="t tb" x="424" y="44">Pass 2</text>
+        <text class="ts" x="424" y="66">read the coordinates</text>
+        <text class="ts" x="424" y="83">of just those corners</text>
+        <text class="ts" x="424" y="100">(136 outlines, 2 s total)</text>
+        <path class="ar" d="M580 68 H603" marker-end="url(#ah6)"/>
+        <rect class="it it-be" x="605" y="20" width="170" height="96" rx="8"/>
+        <text class="t tb" x="619" y="44">Place outlines</text>
+        <text class="ts" x="619" y="66">centre = average of</text>
+        <text class="ts" x="619" y="83">its corners; apply</text>
+        <text class="ts" x="619" y="100">-bbox if given</text>
+        <path class="ar" d="M775 68 H798" marker-end="url(#ah6)"/>
+        <rect class="it it-db" x="800" y="20" width="170" height="96" rx="8"/>
+        <text class="t tb" x="814" y="44">osm_places</text>
+        <text class="ts" x="814" y="66">one transaction:</text>
+        <text class="ts" x="814" y="83">DELETE old rows,</text>
+        <text class="ts" x="814" y="100">COPY new ones</text>
+      </svg>
+    </div>
+    <figcaption>Why two passes: a .pbf file lists every point before any outline. By the time pass 1 meets a building outline, its corner points have already gone by, so pass 2 goes back for them. Doing it in one transaction means the page never sees a half-empty table.</figcaption>
+  </figure>
+  <div class="files">Files: <code>cmd/importplaces/main.go</code><code>geo/overpass.go</code> (IsOffice, PlaceFromTags)<code>migrations/008_create_osm_places_table.sql</code></div>
+  <p class="prose">The importer only builds with <code>CGO_ENABLED=0</code>. With cgo on, the PBF library switches to a C zlib that needs a working C compiler. The <code>//go:build !cgo</code> line at the top of the file makes <code>go build ./...</code> skip it in that case, so the rest of the project still builds.</p>
+</section>
+
+<!-- Database -->
+<section id="database">
+  <header>
+    <span class="eyebrow">Schema</span>
+    <h2>Database changes</h2>
+  </header>
+  <p class="prose">Two new migrations. Apply them by hand in order, like the earlier ones.</p>
+  <div class="schema">
+    <div class="table-card">
+      <h3>companies <small>007</small></h3>
+      <ul>
+        <li class="new"><code>office_address</code><span>text, '' if unset</span></li>
+        <li class="new"><code>lat, lng</code><span>double, null if unset</span></li>
+        <li class="new"><code>place_id</code><span>Nominatim's ID</span></li>
+        <li class="new"><code>geocoded_at</code><span>when it was located</span></li>
+      </ul>
+    </div>
+    <div class="table-card">
+      <h3>jobs <small>007</small></h3>
+      <ul>
+        <li class="new"><code>last_seen_at</code><span>refreshed by each sync</span></li>
+        <li class="new"><code>closed_at</code><span>not set by anything yet</span></li>
+      </ul>
+    </div>
+    <div class="table-card">
+      <h3>osm_places <small>008 · new table</small></h3>
+      <ul>
+        <li class="new"><code>id</code><span>e.g. osm:way/456</span></li>
+        <li class="new"><code>name, kind</code><span>kind = office type</span></li>
+        <li class="new"><code>website, address</code><span>'' when OSM has none</span></li>
+        <li class="new"><code>lat, lng</code><span>indexed together</span></li>
+      </ul>
+    </div>
+  </div>
+  <p class="prose">The sync loop (<code>jobsync/db.go</code>) now refreshes <code>last_seen_at</code> when it sees a job again. It still treats a job as new only the first time it's inserted, so Telegram alerts behave exactly as before.</p>
+</section>
+
+<!-- File map -->
+<section id="files">
+  <header>
+    <span class="eyebrow">Reference</span>
+    <h2>File map</h2>
+  </header>
+  <p class="prose">Every file touched by this feature. Pick a flow to see only its files.</p>
+  <div class="chips" role="group" aria-label="Filter files by flow">
+    <button class="chip" type="button" data-flow="all" aria-pressed="true">All</button>
+    <button class="chip" type="button" data-flow="load" aria-pressed="false">Opening the page</button>
+    <button class="chip" type="button" data-flow="chain" aria-pressed="false">Finding offices</button>
+    <button class="chip" type="button" data-flow="location" aria-pressed="false">Setting a location</button>
+    <button class="chip" type="button" data-flow="track" aria-pressed="false">Track</button>
+    <button class="chip" type="button" data-flow="import" aria-pressed="false">Import</button>
+    <button class="chip" type="button" data-flow="db" aria-pressed="false">Database</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>File</th><th>Layer</th><th>What it does</th><th>Flows</th></tr></thead>
+      <tbody id="file-rows">
+        <tr data-flows="load location track"><td class="path"><code>NearbyPage.tsx</code><small>crontfetch-web/src/pages</small></td><td><span class="layer fe">Browser</span></td><td>Gets your position, loads green and grey pins, the Companies around you list and the Office locations section.</td><td class="flows">page, location, track</td></tr>
+        <tr data-flows="load location track"><td class="path"><code>NearbyMap.tsx</code><small>crontfetch-web/src/components</small></td><td><span class="layer fe">Browser</span></td><td>Leaflet map: you, the 10 km circle, green and grey pins, Track button in popups, click-to-place.</td><td class="flows">page, location, track</td></tr>
+        <tr data-flows="load location track"><td class="path"><code>nearbyService.ts</code><small>crontfetch-web/src/services</small></td><td><span class="layer fe">Browser</span></td><td><code>fetchNearby</code>, <code>fetchNearbyPlaces</code>, <code>setCompanyLocation</code>, <code>findCareerPage</code>, and the <code>NearbyPlace</code> / <code>TrackPrefill</code> types.</td><td class="flows">page, location, track</td></tr>
+        <tr data-flows="track"><td class="path"><code>AddJobs.tsx</code><small>crontfetch-web/src/pages</small></td><td><span class="layer fe">Browser</span></td><td>From Track: looks up the career page, copies roles, locations and experience from your filter, then saves the office location right after adding the company.</td><td class="flows">track</td></tr>
+        <tr data-flows="track"><td class="path"><code>careerpage.go</code><small>cron-fetch/internal/fetcher</small></td><td><span class="layer be">Go API</span></td><td><code>FindCareerPage</code>: searches the company's website and asks six job boards by name; best evidence wins.</td><td class="flows">track</td></tr>
+        <tr data-flows="track"><td class="path"><code>careerpage.go</code><small>cron-fetch/internal/handlers</small></td><td><span class="layer be">Go API</span></td><td><code>GET /career-page</code>, with a 20-second limit.</td><td class="flows">track</td></tr>
+        <tr data-flows="load"><td class="path"><code>pages.css</code><small>crontfetch-web/src/styles</small></td><td><span class="layer fe">Browser</span></td><td>Styles for the map, lists and popups (<code>.nearby-*</code>).</td><td class="flows">page</td></tr>
+        <tr data-flows="load chain location"><td class="path"><code>main.go</code><small>cron-fetch/cmd/api</small></td><td><span class="layer be">Go API</span></td><td>Registers the four routes behind <code>middleware.Auth</code> and sets the source order: database, Overpass, Photon.</td><td class="flows">page, offices, location</td></tr>
+        <tr data-flows="load chain location track"><td class="path"><code>location.go</code><small>cron-fetch/internal/handlers</small></td><td><span class="layer be">Go API</span></td><td><code>SetCompanyLocation</code>, <code>Nearby</code>, <code>NearbyPlaces</code>, plus <code>filterNearby</code> and <code>parseNearbyQuery</code>.</td><td class="flows">page, offices, location, track</td></tr>
+        <tr data-flows="load location"><td class="path"><code>geo.go</code><small>cron-fetch/internal/geo</small></td><td><span class="layer be">Go API</span></td><td><code>DistanceKm</code> (haversine), <code>ValidCoords</code>, and the Nominatim client (one request per second).</td><td class="flows">page, location</td></tr>
+        <tr data-flows="chain"><td class="path"><code>places.go</code><small>cron-fetch/internal/geo</small></td><td><span class="layer be">Go API</span></td><td><code>Places</code>: grid cache, source order, 10-minute skip for failed sources, dedupe, radius filter, sort.</td><td class="flows">offices</td></tr>
+        <tr data-flows="chain"><td class="path"><code>db.go</code><small>cron-fetch/internal/geo</small></td><td><span class="layer be">Go API</span></td><td><code>DBSource</code>: reads <code>osm_places</code> by bounding box; returns <code>ErrNoData</code> when the area is empty.</td><td class="flows">offices</td></tr>
+        <tr data-flows="chain import"><td class="path"><code>overpass.go</code><small>cron-fetch/internal/geo</small></td><td><span class="layer be">Go API</span></td><td>Overpass with 4 mirrors. Also <code>OfficeTypes</code>, <code>IsOffice</code> and <code>PlaceFromTags</code>, shared with the importer.</td><td class="flows">offices, import</td></tr>
+        <tr data-flows="chain"><td class="path"><code>photon.go</code><small>cron-fetch/internal/geo</small></td><td><span class="layer be">Go API</span></td><td>Photon: the 50 nearest offices, then one search per common company-name word, two at a time.</td><td class="flows">offices</td></tr>
+        <tr data-flows="load location"><td class="path"><code>company.go</code><small>cron-fetch/internal/models + handlers</small></td><td><span class="layer be">Go API</span></td><td>Company JSON and queries now include <code>office_address</code>, <code>lat</code>, <code>lng</code>.</td><td class="flows">page, location</td></tr>
+        <tr data-flows="db"><td class="path"><code>db.go</code><small>cron-fetch/internal/jobsync</small></td><td><span class="layer be">Go API</span></td><td>Sync refreshes <code>jobs.last_seen_at</code>; "new job" detection unchanged.</td><td class="flows">database</td></tr>
+        <tr data-flows="import"><td class="path"><code>main.go</code><small>cron-fetch/cmd/importplaces</small></td><td><span class="layer be">Go API</span></td><td>The two-pass PBF import into <code>osm_places</code>. Run by hand.</td><td class="flows">import</td></tr>
+        <tr data-flows="location db"><td class="path"><code>007_add_geo_and_job_status.sql</code><small>cron-fetch/migrations</small></td><td><span class="layer db">Postgres</span></td><td>Location columns on <code>companies</code>; <code>last_seen_at</code> / <code>closed_at</code> on <code>jobs</code>.</td><td class="flows">location, database</td></tr>
+        <tr data-flows="import chain db"><td class="path"><code>008_create_osm_places_table.sql</code><small>cron-fetch/migrations</small></td><td><span class="layer db">Postgres</span></td><td>The <code>osm_places</code> table and its <code>(lat, lng)</code> index.</td><td class="flows">offices, import, database</td></tr>
+        <tr data-flows="load chain location"><td class="path"><code>*_test.go</code><small>internal/geo, internal/handlers</small></td><td><span class="layer be">Go API</span></td><td>Unit tests with fake servers: distance, mirror fallback, cooldown, caching, dedupe, radius filter. No network needed.</td><td class="flows">page, offices, location</td></tr>
+        <tr class="empty-row" hidden><td colspan="4">No files for this flow.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Try it -->
+<section id="try">
+  <header>
+    <span class="eyebrow">Hands on</span>
+    <h2>Try it locally</h2>
+  </header>
+  <p class="prose">PowerShell, from the <code>cron-fetch</code> folder unless noted. Steps 1 and 2 are one-time.</p>
+  <div class="cmd">
+    <button class="copy" type="button" data-target="cmd-run">Copy</button>
+<pre id="cmd-run"><span class="c"># 1. Database tables</span>
+Get-Content migrations\007_add_geo_and_job_status.sql | docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch
+Get-Content migrations\008_create_osm_places_table.sql | docker exec -i cron-fetch-postgres-1 psql -U cronfetch -d cronfetch
+
+<span class="c"># 2. Import offices (Bangalore is in Karnataka)</span>
+curl.exe -L -o karnataka.osm.pbf https://download.openstreetmap.fr/extracts/asia/india/karnataka.osm.pbf
+$env:CGO_ENABLED="0"; go run ./cmd/importplaces -file karnataka.osm.pbf
+
+<span class="c"># 3. Run the API, then the app (second terminal, in crontfetch-web)</span>
+go run ./cmd/api
+npm run dev
+
+<span class="c"># 4. Tests (no network needed)</span>
+go test ./internal/geo ./internal/handlers</pre>
+  </div>
+  <p class="prose">To pretend you're somewhere else: Chrome DevTools → ⋮ → More tools → Sensors → Location, then <strong>Refresh location</strong> on the page.</p>
+
+  <h3>Known gaps</h3>
+  <ul class="gaps">
+    <li>The career page isn't always found: in a sample of 25 offices, 10 got a readable job board. Companies on their own career systems (IBM, Atlassian, Walmart) still need the link pasted by hand.</li>
+    <li>Green pins only cover your own tracked companies. <code>osm_places</code> is the start of a shared company directory, but it has no career pages yet.</li>
+    <li>The Go online switch is still UI only. Next steps: a <code>presence</code> table, job matching, then Web Push.</li>
+    <li><code>jobs.closed_at</code> is never set. The sync only sees jobs that pass a company's filter, so it can't tell "closed" from "no longer matching".</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+(function () {
+  // File map filter
+  var chips = document.querySelectorAll('.chip');
+  var rows = document.querySelectorAll('#file-rows tr[data-flows]');
+  var empty = document.querySelector('#file-rows .empty-row');
+  function apply(flow) {
+    var shown = 0;
+    rows.forEach(function (r) {
+      var match = flow === 'all' || r.getAttribute('data-flows').split(' ').indexOf(flow) !== -1;
+      r.hidden = !match;
+      if (match) shown++;
+    });
+    empty.hidden = shown !== 0;
+    chips.forEach(function (c) { c.setAttribute('aria-pressed', String(c.dataset.flow === flow)); });
+  }
+  chips.forEach(function (c) { c.addEventListener('click', function () { apply(c.dataset.flow); }); });
+
+  // Copy buttons
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var pre = document.getElementById(btn.dataset.target);
+      var text = pre.innerText;
+      function done(label) { btn.textContent = label; setTimeout(function () { btn.textContent = 'Copy'; }, 1600); }
+      function selectIt() {
+        var range = document.createRange();
+        range.selectNodeContents(pre);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        done('Selected, press Ctrl+C');
+      }
+      try {
+        navigator.clipboard.writeText(text).then(function () { done('Copied'); }, selectIt);
+      } catch (e) { selectIt(); }
+    });
+  });
+})();
+</script>
+</body>
+</html>
