@@ -145,6 +145,41 @@ Auth: required.
 | 401 | `{"error":"missing or invalid authorization token"}` | missing header, bad signature, or expired |
 | 404 | `{"error":"user not found"}` | token valid but the account no longer exists |
 
+## `GET /me/preferences`
+
+Auth: required. What the caller is looking for, used to fill the job filters.
+
+**Success — `200`**
+```json
+{
+  "locations": ["Bangalore", "Remote"],
+  "roles": ["Backend developer"],
+  "interests": ["Go", "React"],
+  "min_experience_years": 2,
+  "max_experience_years": null
+}
+```
+A new account gets empty lists and `null` experience.
+
+**Errors:** `401` (bad token), `404` `{"error":"user not found"}`.
+
+## `PUT /me/preferences`
+
+Auth: required. Replaces all preferences, so send every field; an omitted
+list is cleared and an omitted experience becomes `null`. Blank list entries
+are dropped and the rest trimmed. Unknown keys are rejected.
+
+**Success — `200`** — the saved preferences, same shape as `GET`.
+
+**Errors**
+| Status | Body | When |
+|---|---|---|
+| 400 | `{"error":"invalid request body: ..."}` | bad JSON or an unknown key |
+| 400 | `{"error":"min_experience_years cannot be negative"}` | same for `max_experience_years` |
+| 400 | `{"error":"min_experience_years cannot be greater than max_experience_years"}` | |
+| 401 | `{"error":"missing or invalid authorization token"}` | |
+| 404 | `{"error":"user not found"}` | |
+
 ---
 
 ## `POST /companies`

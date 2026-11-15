@@ -13,3 +13,13 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
+
+// Preferences is what a user is looking for, stored on their users row.
+// The frontend uses it to fill the job filters.
+type Preferences struct {
+	Locations          []string `json:"locations"`
+	Roles              []string `json:"roles"`
+	Interests          []string `json:"interests"`
+	MinExperienceYears *int     `json:"min_experience_years"`
+	MaxExperienceYears *int     `json:"max_experience_years"`
+}
