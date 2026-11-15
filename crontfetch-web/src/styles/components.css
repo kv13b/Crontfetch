@@ -211,6 +211,11 @@
   color: var(--color-danger);
 }
 
+.alert--success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
 /* Spinner */
 .spinner {
   width: 16px;
