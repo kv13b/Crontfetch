@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import TagInput from '../components/TagInput'
 import { fetchPreferences, savePreferences } from '../services/profileService'
+import type { Preferences } from '../services/profileService'
 import { useAppSelector } from '../store/hooks'
 
 const toNumber = (s: string): number | null => (s.trim() === '' ? null : Number(s))
@@ -24,16 +25,19 @@ function ProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
+  const fillForm = (p: Preferences) => {
+    setLocations(p.locations)
+    setRoles(p.roles)
+    setInterests(p.interests)
+    setMinExp(p.min_experience_years?.toString() ?? '')
+    setMaxExp(p.max_experience_years?.toString() ?? '')
+  }
+
   useEffect(() => {
     let cancelled = false
     fetchPreferences(token)
       .then((p) => {
-        if (cancelled) return
-        setLocations(p.locations)
-        setRoles(p.roles)
-        setInterests(p.interests)
-        setMinExp(p.min_experience_years?.toString() ?? '')
-        setMaxExp(p.max_experience_years?.toString() ?? '')
+        if (!cancelled) fillForm(p)
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message)
@@ -45,6 +49,13 @@ function ProfilePage() {
       cancelled = true
     }
   }, [token])
+
+  // The "saved" message fades out on its own.
+  useEffect(() => {
+    if (!saved) return
+    const timer = setTimeout(() => setSaved(false), 3000)
+    return () => clearTimeout(timer)
+  }, [saved])
 
   // Any edit hides the old "Saved" message.
   const edited =
@@ -72,13 +83,16 @@ function ProfilePage() {
     setSaving(true)
     setError(null)
     try {
-      await savePreferences(token, {
-        locations,
-        roles,
-        interests,
-        min_experience_years: min,
-        max_experience_years: max,
-      })
+      // Show what the server stored (trimmed, blanks dropped).
+      fillForm(
+        await savePreferences(token, {
+          locations,
+          roles,
+          interests,
+          min_experience_years: min,
+          max_experience_years: max,
+        }),
+      )
       setSaved(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save preferences')

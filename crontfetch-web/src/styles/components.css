@@ -159,17 +159,26 @@
 .tag__remove {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
-  font-size: var(--fs-base);
-  line-height: 1;
+  width: 18px;
+  height: 18px;
+  padding: 0;
   color: inherit;
   background: transparent;
+  border: 0;
   border-radius: var(--radius-full);
+  opacity: 0.6;
+  transition: opacity var(--transition), background var(--transition);
 }
 
-.tag__remove:hover {
+.tag__remove:hover,
+.tag__remove:focus-visible {
+  opacity: 1;
   background: rgb(91 76 240 / 0.15);
+}
+
+.tag__remove:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
 }
 
 /* Cards */

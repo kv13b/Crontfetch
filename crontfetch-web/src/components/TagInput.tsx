@@ -42,7 +42,9 @@ function TagInput({ id, values, onChange, placeholder }: TagInputProps) {
             aria-label={`Remove ${value}`}
             onClick={() => remove(value)}
           >
-            ×
+            <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+              <path d="M1 1l6 6M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
           </button>
         </span>
       ))}
