@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
-import { emptyFilter } from '../../types/filter'
+import { emptyFilter, isFilterEmpty } from '../../types/filter'
 import type { JobFilter } from '../../types/filter'
 import { logout } from '../auth'
 
@@ -39,9 +39,12 @@ function saveFilter(filter: JobFilter | null) {
 
 export interface FilterState {
   filter: JobFilter
+  // The saved profile has been offered to the filter this login, so it isn't
+  // reapplied after the user changes or clears the filter.
+  profileApplied: boolean
 }
 
-const initialState: FilterState = { filter: loadFilter() }
+const initialState: FilterState = { filter: loadFilter(), profileApplied: false }
 
 const filterSlice = createSlice({
   name: 'filter',
@@ -51,15 +54,24 @@ const filterSlice = createSlice({
       state.filter = action.payload
       saveFilter(action.payload)
     },
+    // Fills the filter from the profile only if the user hasn't set one.
+    applyProfile(state, action: PayloadAction<JobFilter>) {
+      state.profileApplied = true
+      if (isFilterEmpty(state.filter)) {
+        state.filter = action.payload
+        saveFilter(action.payload)
+      }
+    },
   },
   extraReducers: (builder) => {
     // Don't leave one person's filter behind on a shared device.
     builder.addCase(logout, (state) => {
       state.filter = emptyFilter
+      state.profileApplied = false
       saveFilter(null)
     })
   },
 })
 
-export const { setFilter } = filterSlice.actions
+export const { setFilter, applyProfile } = filterSlice.actions
 export default filterSlice.reducer

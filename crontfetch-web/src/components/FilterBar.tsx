@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { setFilter } from '../store/filter'
+import { fetchPreferences } from '../services/profileService'
+import { applyProfile, setFilter } from '../store/filter'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
-import { emptyFilter, isFilterEmpty } from '../types/filter'
+import { emptyFilter, filterFromProfile, isFilterEmpty } from '../types/filter'
 import type { JobFilter } from '../types/filter'
 import TagInput from './TagInput'
 
@@ -138,8 +139,19 @@ function ExperiencePopover({ years, onApply }: ExperiencePopoverProps) {
 function FilterBar() {
   const dispatch = useAppDispatch()
   const filter = useAppSelector((s) => s.filter.filter)
+  const profileApplied = useAppSelector((s) => s.filter.profileApplied)
+  const token = useAppSelector((s) => s.auth.token)
   const [openKey, setOpenKey] = useState<OpenKey>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+
+  // Start from the saved profile once per login. A failed load is retried
+  // the next time the bar mounts.
+  useEffect(() => {
+    if (profileApplied || !token) return
+    fetchPreferences(token)
+      .then((p) => dispatch(applyProfile(filterFromProfile(p))))
+      .catch(() => {})
+  }, [profileApplied, token, dispatch])
 
   // Close on a click outside the bar or on Escape.
   useEffect(() => {

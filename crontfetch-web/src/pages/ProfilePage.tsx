@@ -3,7 +3,9 @@ import type { FormEvent } from 'react'
 import TagInput from '../components/TagInput'
 import { fetchPreferences, savePreferences } from '../services/profileService'
 import type { Preferences } from '../services/profileService'
-import { useAppSelector } from '../store/hooks'
+import { setFilter } from '../store/filter'
+import { useAppDispatch, useAppSelector } from '../store/hooks'
+import { filterFromProfile } from '../types/filter'
 
 const toNumber = (s: string): number | null => (s.trim() === '' ? null : Number(s))
 
@@ -13,6 +15,7 @@ function validExperience(n: number | null): boolean {
 
 function ProfilePage() {
   const token = useAppSelector((s) => s.auth.token)
+  const dispatch = useAppDispatch()
 
   const [locations, setLocations] = useState<string[]>([])
   const [roles, setRoles] = useState<string[]>([])
@@ -83,16 +86,17 @@ function ProfilePage() {
     setSaving(true)
     setError(null)
     try {
+      const stored = await savePreferences(token, {
+        locations,
+        roles,
+        interests,
+        min_experience_years: min,
+        max_experience_years: max,
+      })
       // Show what the server stored (trimmed, blanks dropped).
-      fillForm(
-        await savePreferences(token, {
-          locations,
-          roles,
-          interests,
-          min_experience_years: min,
-          max_experience_years: max,
-        }),
-      )
+      fillForm(stored)
+      // A saved profile replaces the job filters on Search jobs and Jobs around me.
+      dispatch(setFilter(filterFromProfile(stored)))
       setSaved(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save preferences')
