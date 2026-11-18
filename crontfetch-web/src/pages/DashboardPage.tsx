@@ -1,19 +1,36 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { fetchPreferences } from "../services/profileService";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import {
   deleteCompany,
   fetchCompanies,
 } from "../store/companies/companiesThunks";
+import { filterFromProfile, isFilterEmpty } from "../types/filter";
 
 function DashboardPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { loading, error, companies } = useAppSelector((s) => s.companies);
+  const token = useAppSelector((s) => s.auth.token);
+  const [hasPreferences, setHasPreferences] = useState(false);
 
   useEffect(() => {
     dispatch(fetchCompanies());
   }, [dispatch]);
+
+  // Only changes the button label, so a failed load just keeps "Set".
+  useEffect(() => {
+    let cancelled = false;
+    fetchPreferences(token)
+      .then((p) => {
+        if (!cancelled) setHasPreferences(!isFilterEmpty(filterFromProfile(p)));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const getDomain = (url: string) => {
     try {
@@ -71,15 +88,24 @@ function DashboardPage() {
                 : "Here is where your tracked companies and live job updates appear."}
             </p>
           </div>
-          {companies.length > 0 && (
+          <div className="dashboard__actions">
             <button
               type="button"
-              className="btn btn--primary"
-              onClick={() => navigate("/add-jobs")}
+              className="btn btn--secondary"
+              onClick={() => navigate("/profile")}
             >
-              + Add another company
+              {hasPreferences ? "Update job preferences" : "Set job preferences"}
             </button>
-          )}
+            {companies.length > 0 && (
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => navigate("/add-jobs")}
+              >
+                + Add another company
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Content Section */}

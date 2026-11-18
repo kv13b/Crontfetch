@@ -464,6 +464,12 @@
   gap: var(--space-4);
 }
 
+.dashboard__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
 .company-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
