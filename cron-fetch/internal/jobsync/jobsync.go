@@ -30,7 +30,7 @@ func SyncAll(ctx context.Context, pool *pgxpool.Pool, botToken, chatID string) {
 
 	slog.Info("jobsync: starting sync", "companies", len(companies))
 	for _, c := range companies {
-		if err := syncCompany(ctx, pool, botToken, chatID, c); err != nil {
+		if _, err := SyncCompany(ctx, pool, botToken, chatID, c); err != nil {
 			slog.Error("jobsync: syncing company", "error", err, "company_id", c.ID, "name", c.Name)
 		}
 	}
@@ -44,13 +44,17 @@ func SyncCompanyByID(ctx context.Context, pool *pgxpool.Pool, botToken, chatID, 
 	if err != nil {
 		return fmt.Errorf("looking up company: %w", err)
 	}
-	return syncCompany(ctx, pool, botToken, chatID, c)
+	_, err = SyncCompany(ctx, pool, botToken, chatID, c)
+	return err
 }
 
-func syncCompany(ctx context.Context, pool *pgxpool.Pool, botToken, chatID string, c models.Company) error {
+// SyncCompany checks one company for new matching jobs, records them and
+// notifies about them. It returns how many jobs were new; a first sync
+// records a silent baseline and returns 0.
+func SyncCompany(ctx context.Context, pool *pgxpool.Pool, botToken, chatID string, c models.Company) (int, error) {
 	jobs, err := fetcher.FetchJobs(ctx, c.CareerURL, c.Platform, c.Board, maxPagesPerFetch)
 	if err != nil {
-		return fmt.Errorf("fetching jobs: %w", err)
+		return 0, fmt.Errorf("fetching jobs: %w", err)
 	}
 	matched := fetcher.FilterJobs(jobs, c.Roles, c.Locations, c.MinExperienceYears, c.MaxExperienceYears)
 
@@ -59,17 +63,17 @@ func syncCompany(ctx context.Context, pool *pgxpool.Pool, botToken, chatID strin
 	// them at once, since they aren't newly posted, just newly tracked.
 	seenBefore, err := hasSeenJobs(ctx, pool, c.ID)
 	if err != nil {
-		return fmt.Errorf("checking sync history: %w", err)
+		return 0, fmt.Errorf("checking sync history: %w", err)
 	}
 
 	newJobs, err := recordNewJobs(ctx, pool, c.ID, matched)
 	if err != nil {
-		return fmt.Errorf("recording jobs: %w", err)
+		return 0, fmt.Errorf("recording jobs: %w", err)
 	}
 
 	if !seenBefore {
 		slog.Info("jobsync: baseline recorded", "company_id", c.ID, "name", c.Name, "matched", len(matched))
-		return nil
+		return 0, nil
 	}
 
 	slog.Info("jobsync: synced", "company_id", c.ID, "name", c.Name, "matched", len(matched), "new", len(newJobs))
@@ -81,5 +85,5 @@ func syncCompany(ctx context.Context, pool *pgxpool.Pool, botToken, chatID strin
 			slog.Error("jobsync: sending telegram notification", "error", err, "company_id", c.ID, "job_id", j.ID)
 		}
 	}
-	return nil
+	return len(newJobs), nil
 }

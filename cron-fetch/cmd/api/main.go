@@ -65,6 +65,7 @@ func main() {
 	mux.Handle("GET /nearby", middleware.Auth(cfg.JWTSecret)(handlers.Nearby(pool)))
 	mux.Handle("GET /career-page", middleware.Auth(cfg.JWTSecret)(handlers.FindCareerPage()))
 	mux.Handle("GET /nearby/places", middleware.Auth(cfg.JWTSecret)(handlers.NearbyPlaces(places)))
+	mux.Handle("POST /run-now", middleware.Auth(cfg.JWTSecret)(handlers.RunNowHandler(pool, cfg.TelegramBotToken, cfg.TelegramChatID)))
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

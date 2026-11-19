@@ -180,6 +180,32 @@ are dropped and the rest trimmed. Unknown keys are rejected.
 | 401 | `{"error":"missing or invalid authorization token"}` | |
 | 404 | `{"error":"user not found"}` | |
 
+## `POST /run-now`
+
+Auth: required. Checks all of the caller's companies for new matching jobs
+right away, exactly like the background sync: new jobs are recorded and sent
+to Telegram, and a company's first sync records a silent baseline (counted
+as 0 new). Companies run one after another, so this can take a minute or
+more; a company that fails is listed and the rest still run.
+
+**Success — `200`**
+```json
+{
+  "companies": 6,
+  "new_jobs": 3,
+  "failed": [
+    { "company_id": "…", "name": "Palo Alto Networks", "error": "fetching jobs: career page returned status 403" }
+  ]
+}
+```
+
+**Errors**
+| Status | Body | When |
+|---|---|---|
+| 401 | `{"error":"missing or invalid authorization token"}` | |
+| 429 | `{"error":"please wait a minute before syncing again"}` | the same user synced less than a minute ago |
+| 503 | `{"error":"job alerts are not configured on the server"}` | `TELEGRAM_BOT_TOKEN` or `TELEGRAM_CHAT_ID` isn't set |
+
 ---
 
 ## `POST /companies`
