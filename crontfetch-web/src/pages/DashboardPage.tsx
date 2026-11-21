@@ -8,6 +8,42 @@ import {
 } from "../store/companies/companiesThunks";
 import { filterFromProfile, isFilterEmpty } from "../types/filter";
 
+// Show a few chips, then "+N" so long filter lists don't stretch the card.
+const MAX_CHIPS = 3;
+
+function FilterRow({ label, values }: { label: string; values: string[] }) {
+  return (
+    <div className="company-card__filter">
+      <dt>{label}</dt>
+      <dd>
+        {values.length === 0 ? (
+          <span className="company-card__any">Any</span>
+        ) : (
+          <>
+            {values.slice(0, MAX_CHIPS).map((v) => (
+              <span key={v} className="company-card__chip">
+                {v}
+              </span>
+            ))}
+            {values.length > MAX_CHIPS && (
+              <span className="company-card__more">
+                +{values.length - MAX_CHIPS}
+              </span>
+            )}
+          </>
+        )}
+      </dd>
+    </div>
+  );
+}
+
+function experienceText(min: number | null, max: number | null): string {
+  if (min !== null && max !== null) return `${min}–${max} yrs`;
+  if (min !== null) return `${min}+ yrs`;
+  if (max !== null) return `Up to ${max} yrs`;
+  return "Any";
+}
+
 function DashboardPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -128,18 +164,50 @@ function DashboardPage() {
           <div className="company-grid">
             {companies.map((company) => (
               <div key={company.id} className="card company-card">
-                <div className="company-info">
-                  <h3>{company.name}</h3>
-                  <a
-                    href={company.career_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="company-url"
-                  >
-                    🔗 {getDomain(company.career_url)}
-                  </a>
+                <div className="company-card__head">
+                  <span className="company-card__avatar" aria-hidden="true">
+                    {company.name.trim().charAt(0).toUpperCase()}
+                  </span>
+                  <div className="company-info">
+                    <h3>{company.name}</h3>
+                    <a
+                      href={company.career_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="company-url"
+                    >
+                      {getDomain(company.career_url)} ↗
+                    </a>
+                  </div>
+                  {company.platform && (
+                    <span className="badge company-card__platform">
+                      {company.platform}
+                    </span>
+                  )}
                 </div>
+
+                <dl className="company-card__filters">
+                  <FilterRow label="Roles" values={company.roles} />
+                  <FilterRow label="Locations" values={company.locations} />
+                  <div className="company-card__filter">
+                    <dt>Experience</dt>
+                    <dd>
+                      {experienceText(
+                        company.min_experience_years,
+                        company.max_experience_years,
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+
                 <div className="company-actions">
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm company-actions__main"
+                    onClick={() => navigate(`/companies/${company.id}/jobs`)}
+                  >
+                    View jobs
+                  </button>
                   {/* Edit button passes company object in location state */}
                   <button
                     type="button"
@@ -150,23 +218,9 @@ function DashboardPage() {
                   >
                     Edit
                   </button>
-                  <a
-                    href={company.career_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn btn--pricompaniesmary btn--sm"
-                    style={{ textDecoration: "none", textAlign: "center" }}
-                  >
-                    Career Page ↗
-                  </a>
                   <button
                     type="button"
                     className="btn btn--danger btn--sm"
-                    style={{
-                      background: "#fee2e2",
-                      color: "#991b1b",
-                      border: "none",
-                    }}
                     onClick={() => {
                       if (
                         window.confirm(

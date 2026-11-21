@@ -59,6 +59,21 @@
   font-size: var(--fs-base);
 }
 
+.btn--danger {
+  background: transparent;
+  color: var(--color-danger);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: var(--color-danger-soft);
+}
+
+.btn--sm {
+  height: 32px;
+  padding-inline: var(--space-3);
+  font-size: var(--fs-xs);
+}
+
 .btn--block {
   width: 100%;
 }
@@ -218,6 +233,12 @@
 .alert--error {
   background: var(--color-danger-soft);
   color: var(--color-danger);
+}
+
+.alert--info {
+  margin-bottom: var(--space-4);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
 }
 
 .alert--success {
