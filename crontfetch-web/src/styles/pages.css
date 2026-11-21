@@ -494,31 +494,166 @@
   border-color: var(--color-border-strong);
 }
 
+.company-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.company-card__avatar {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-md);
+}
+
+.company-info {
+  flex: 1;
+  min-width: 0;
+}
+
 .company-info h3 {
   font-size: var(--fs-lg);
   font-weight: var(--fw-semibold);
-  margin-bottom: var(--space-1);
+  line-height: 1.3;
+  margin-bottom: 2px;
   color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .company-url {
+  display: block;
   font-size: var(--fs-xs);
   color: var(--color-text-subtle);
-  word-break: break-all;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: var(--space-4);
+  white-space: nowrap;
+}
+
+.company-url:hover {
+  color: var(--color-primary);
+}
+
+.company-card__platform {
+  flex-shrink: 0;
+  text-transform: capitalize;
+}
+
+.company-card__filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.company-card__filter {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.company-card__filter dt {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--color-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.company-card__filter dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+  color: var(--color-text);
+}
+
+.company-card__chip,
+.company-card__more {
+  padding: 2px var(--space-2);
+  font-size: var(--fs-xs);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+}
+
+.company-card__more {
+  color: var(--color-text-subtle);
+}
+
+.company-card__any {
+  color: var(--color-text-subtle);
 }
 
 .company-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   border-top: 1px solid var(--color-border);
   padding-top: var(--space-4);
   margin-top: auto;
+}
+
+.company-actions__main {
+  flex: 1;
+}
+
+/* Company jobs */
+.back-link {
+  display: inline-block;
+  margin-bottom: var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--color-text-subtle);
+}
+
+.back-link:hover {
+  color: var(--color-primary);
+}
+
+.job-list {
+  display: flex;
+  flex-direction: column;
+  padding-block: var(--space-2);
+}
+
+.job-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-4);
+}
+
+.job-list__item + .job-list__item {
+  border-top: 1px solid var(--color-border);
+}
+
+.job-list__item h3 {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  margin-bottom: var(--space-1);
+}
+
+.job-list__item p {
+  font-size: var(--fs-sm);
+  color: var(--color-text-subtle);
+}
+
+@media (max-width: 640px) {
+  .job-list__item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 /* Jobs around me */
 .nearby {

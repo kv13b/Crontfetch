@@ -10,6 +10,7 @@ import ProfilePage from './pages/ProfilePage'
 import SearchJobsPage from './pages/SearchJobsPage'
 import SignupPage from './pages/SignupPage'
 import AddJobs from './pages/AddJobs'
+import CompanyJobsPage from './pages/CompanyJobsPage'
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           <Route path="search" element={<SearchJobsPage />} />
           <Route path="nearby" element={<NearbyPage />} />
           <Route path="add-jobs" element={<AddJobs />} />
+          <Route path="companies/:id/jobs" element={<CompanyJobsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
