@@ -19,7 +19,9 @@ CronFetch is a full-stack automated career page tracker that scans company board
 
 **Secure Authentication & Management:** JWT-based signup/login alongside a dashboard to add, edit and delete tracked companies.
 
-**In progress:** Sync Now button (`POST /run-now`), Search jobs page, and filling the job filters from your profile.
+**Sync Now:** A dashboard button (`POST /run-now`) that checks all your companies immediately and sends Telegram alerts for new jobs. Limited to once a minute.
+
+**In progress:** Search jobs page.
 
 ## Project structure
 
