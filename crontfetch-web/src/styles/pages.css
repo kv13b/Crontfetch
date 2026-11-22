@@ -470,6 +470,14 @@
   gap: var(--space-3);
 }
 
+.dashboard__notice {
+  margin-bottom: var(--space-6);
+}
+
+.dashboard__notice .alert {
+  margin: 0;
+}
+
 .company-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

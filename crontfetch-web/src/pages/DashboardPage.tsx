@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchPreferences } from "../services/profileService";
+import { runSyncNow } from "../services/syncService";
+import type { SyncResult } from "../services/syncService";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import {
   deleteCompany,
@@ -44,12 +46,49 @@ function experienceText(min: number | null, max: number | null): string {
   return "Any";
 }
 
+function syncSummary(r: SyncResult): { ok: boolean; text: string } {
+  const jobs = `${r.new_jobs} new ${r.new_jobs === 1 ? "job" : "jobs"}`;
+  const text = `Checked ${r.companies} ${r.companies === 1 ? "company" : "companies"}: ${jobs}${r.new_jobs > 0 ? ", sent to Telegram" : ""}.`;
+  if (r.failed.length === 0) return { ok: true, text };
+  return {
+    ok: false,
+    text: `${text} Couldn't check: ${r.failed.map((f) => f.name).join(", ")}.`,
+  };
+}
+
 function DashboardPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { loading, error, companies } = useAppSelector((s) => s.companies);
   const token = useAppSelector((s) => s.auth.token);
   const [hasPreferences, setHasPreferences] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
+
+  // The result message fades out on its own.
+  useEffect(() => {
+    if (!syncResult) return;
+    const timer = setTimeout(() => setSyncResult(null), 8000);
+    return () => clearTimeout(timer);
+  }, [syncResult]);
+
+  const syncNow = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      setSyncResult(syncSummary(await runSyncNow(token)));
+    } catch (e) {
+      setSyncResult({
+        ok: false,
+        text: e instanceof Error ? e.message : "Sync failed",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     dispatch(fetchCompanies());
@@ -133,16 +172,46 @@ function DashboardPage() {
               {hasPreferences ? "Update job preferences" : "Set job preferences"}
             </button>
             {companies.length > 0 && (
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => navigate("/add-jobs")}
-              >
-                + Add another company
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={syncNow}
+                  disabled={syncing}
+                >
+                  {syncing ? "Syncing…" : "Sync now"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => navigate("/add-jobs")}
+                >
+                  + Add another company
+                </button>
+              </>
             )}
           </div>
         </div>
+
+        {(syncing || syncResult) && (
+          <div className="dashboard__notice">
+            {syncing ? (
+              <p className="alert alert--info" role="status">
+                Checking your companies for new jobs. This can take up to a
+                minute.
+              </p>
+            ) : (
+              syncResult && (
+                <p
+                  className={`alert ${syncResult.ok ? "alert--success" : "alert--error"}`}
+                  role={syncResult.ok ? "status" : "alert"}
+                >
+                  {syncResult.text}
+                </p>
+              )
+            )}
+          </div>
+        )}
 
         {/* Content Section */}
         {companies.length === 0 ? (
