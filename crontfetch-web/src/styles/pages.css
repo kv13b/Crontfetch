@@ -616,6 +616,34 @@
   flex: 1;
 }
 
+/* Telegram connect */
+.telegram-connect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.telegram-connect h2 {
+  font-size: var(--fs-xl);
+}
+
+.telegram-connect__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.telegram-connect__hint {
+  font-size: var(--fs-sm);
+  color: var(--color-text-subtle);
+}
+
+.telegram-connect__hint:hover {
+  color: var(--color-primary);
+}
+
 /* Company jobs */
 .back-link {
   display: inline-block;

@@ -1,11 +1,14 @@
 import PagePlaceholder from '../components/PagePlaceholder'
+import TelegramConnect from '../components/TelegramConnect'
 
 function NotificationsPage() {
   return (
     <PagePlaceholder
       title="Notifications"
-      description="Alerts you may have missed. They are kept for 5 days."
-    />
+      description="Choose where job alerts go. Alerts you may have missed will also appear here, kept for 5 days."
+    >
+      <TelegramConnect />
+    </PagePlaceholder>
   )
 }
 
