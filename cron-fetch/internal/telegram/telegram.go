@@ -52,3 +52,37 @@ func SendMessage(ctx context.Context, botToken, chatID, text string) error {
 	}
 	return nil
 }
+
+// BotUsername returns the bot's @username (without the @), used to build
+// t.me links to it.
+func BotUsername(ctx context.Context, botToken string) (string, error) {
+	endpoint := apiBase + "/bot" + url.PathEscape(botToken) + "/getMe"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("building telegram request: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("calling telegram getMe: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		OK          bool   `json:"ok"`
+		Description string `json:"description"`
+		Result      struct {
+			Username string `json:"username"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decoding telegram response: %w", err)
+	}
+	if !result.OK {
+		return "", fmt.Errorf("telegram API error: %s", result.Description)
+	}
+	if result.Result.Username == "" {
+		return "", fmt.Errorf("telegram getMe returned no username")
+	}
+	return result.Result.Username, nil
+}

@@ -53,6 +53,27 @@ func TestSendMessage_APIError(t *testing.T) {
 	}
 }
 
+func TestBotUsername(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		json.NewEncoder(w).Encode(map[string]any{"ok": true, "result": map[string]any{"username": "CronFetchBot"}})
+	}))
+	defer srv.Close()
+
+	old := apiBase
+	apiBase = srv.URL
+	defer func() { apiBase = old }()
+
+	got, err := BotUsername(context.Background(), "TESTTOKEN")
+	if err != nil {
+		t.Fatalf("BotUsername() error = %v", err)
+	}
+	if gotPath != "/botTESTTOKEN/getMe" || got != "CronFetchBot" {
+		t.Errorf("path = %q, username = %q", gotPath, got)
+	}
+}
+
 // TestSendMessage_Live sends a real message to your Telegram, using the same
 // TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID as the app. It's skipped if they
 // aren't set in the environment running the test.

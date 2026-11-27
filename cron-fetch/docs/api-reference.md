@@ -180,6 +180,39 @@ are dropped and the rest trimmed. Unknown keys are rejected.
 | 401 | `{"error":"missing or invalid authorization token"}` | |
 | 404 | `{"error":"user not found"}` | |
 
+## `GET /me/telegram`
+
+Auth: required. Whether the caller has connected a Telegram chat for alerts.
+
+**Success — `200`** — `{"connected": true}`
+
+**Errors:** `401` (bad token), `404` `{"error":"user not found"}`.
+
+## `POST /me/telegram/link`
+
+Auth: required. Makes a fresh one-time code (valid 10 minutes) and returns
+the link that opens the bot with it. Tapping **Start** in Telegram sends the
+bot `/start <code>`, which is how the server learns the user's chat. Any
+older code for this user stops working.
+
+**Success — `200`**
+```json
+{ "url": "https://t.me/CronFetchBot?start=Xk2...", "expires_at": "2026-11-27T10:20:00Z" }
+```
+
+**Errors**
+| Status | Body | When |
+|---|---|---|
+| 401 | `{"error":"missing or invalid authorization token"}` | |
+| 502 | `{"error":"could not reach Telegram, please try again"}` | looking up the bot's username failed |
+| 503 | `{"error":"job alerts are not configured on the server"}` | `TELEGRAM_BOT_TOKEN` isn't set |
+
+## `DELETE /me/telegram`
+
+Auth: required. Stops sending the caller's alerts to Telegram.
+
+**Success — `204`**, no body.
+
 ## `POST /run-now`
 
 Auth: required. Checks all of the caller's companies for new matching jobs
