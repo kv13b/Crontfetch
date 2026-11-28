@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -51,6 +52,56 @@ func SendMessage(ctx context.Context, botToken, chatID, text string) error {
 		return fmt.Errorf("telegram API error: %s", result.Description)
 	}
 	return nil
+}
+
+// Update is one incoming event for the bot. Only messages are requested.
+type Update struct {
+	UpdateID int64    `json:"update_id"`
+	Message  *Message `json:"message"`
+}
+
+type Message struct {
+	Text string `json:"text"`
+	Chat Chat   `json:"chat"`
+}
+
+type Chat struct {
+	ID int64 `json:"id"`
+}
+
+// GetUpdates long-polls for new messages to the bot. offset confirms every
+// update before it, so Telegram stops resending those. timeoutSec must stay
+// under httpClient's 15s timeout. It fails while the bot has a webhook set.
+func GetUpdates(ctx context.Context, botToken string, offset int64, timeoutSec int) ([]Update, error) {
+	q := url.Values{
+		"offset":          {strconv.FormatInt(offset, 10)},
+		"timeout":         {strconv.Itoa(timeoutSec)},
+		"allowed_updates": {`["message"]`},
+	}
+	endpoint := apiBase + "/bot" + url.PathEscape(botToken) + "/getUpdates?" + q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("building telegram request: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("calling telegram getUpdates: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		OK          bool     `json:"ok"`
+		Description string   `json:"description"`
+		Result      []Update `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding telegram response: %w", err)
+	}
+	if !result.OK {
+		return nil, fmt.Errorf("telegram API error: %s", result.Description)
+	}
+	return result.Result, nil
 }
 
 // BotUsername returns the bot's @username (without the @), used to build

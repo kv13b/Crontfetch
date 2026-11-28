@@ -16,6 +16,7 @@ import (
 	"github.com/kv13b/Crontfetch/internal/handlers"
 	"github.com/kv13b/Crontfetch/internal/jobsync"
 	"github.com/kv13b/Crontfetch/internal/middleware"
+	"github.com/kv13b/Crontfetch/internal/telegrambot"
 )
 
 func main() {
@@ -41,6 +42,9 @@ func main() {
 		slog.Warn("jobsync: disabled, TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID not set")
 	} else {
 		go runJobSync(ctx, pool, cfg)
+	}
+	if cfg.TelegramBotToken != "" {
+		go telegrambot.Listen(ctx, pool, cfg.TelegramBotToken)
 	}
 
 	geocoder := geo.NewNominatim()

@@ -74,6 +74,30 @@ func TestBotUsername(t *testing.T) {
 	}
 }
 
+func TestGetUpdates(t *testing.T) {
+	var gotPath, gotOffset string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotOffset = r.URL.Path, r.URL.Query().Get("offset")
+		w.Write([]byte(`{"ok":true,"result":[{"update_id":7,"message":{"text":"/start abc","chat":{"id":12345}}}]}`))
+	}))
+	defer srv.Close()
+
+	old := apiBase
+	apiBase = srv.URL
+	defer func() { apiBase = old }()
+
+	got, err := GetUpdates(context.Background(), "TESTTOKEN", 5, 0)
+	if err != nil {
+		t.Fatalf("GetUpdates() error = %v", err)
+	}
+	if gotPath != "/botTESTTOKEN/getUpdates" || gotOffset != "5" {
+		t.Errorf("path = %q, offset = %q", gotPath, gotOffset)
+	}
+	if len(got) != 1 || got[0].UpdateID != 7 || got[0].Message.Text != "/start abc" || got[0].Message.Chat.ID != 12345 {
+		t.Errorf("updates = %+v", got)
+	}
+}
+
 // TestSendMessage_Live sends a real message to your Telegram, using the same
 // TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID as the app. It's skipped if they
 // aren't set in the environment running the test.
